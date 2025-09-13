@@ -1,5 +1,4 @@
 import '@/app/global.css';
-import { Inter } from 'next/font/google';
 
 import { baseUrl, createMetadata } from '@/lib/metadata';
 import { Body } from '@/app/layout.client';
@@ -14,13 +13,9 @@ export const metadata = createMetadata({
   metadataBase: baseUrl,
 });
 
-const inter = Inter({
-  subsets: ['latin'],
-});
-
 export default function Layout({ children }: LayoutProps<'/'>) {
   return (
-    <html lang="en" className={inter.className} suppressHydrationWarning>
+    <html lang="en" className="font-sans" suppressHydrationWarning>
       <Body>
         <Provider>{children}</Provider>
       </Body>
