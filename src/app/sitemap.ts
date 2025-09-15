@@ -7,6 +7,15 @@ export const revalidate = false;
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const url = (path: string): string => new URL(path, baseUrl).toString();
 
+    const pageSitemapEntryPromises = source.getPages().map(async (page) => {
+        const { lastModified } = await page.data.load();
+        return {
+            url: url(page.url),
+            lastModified: lastModified ? new Date(lastModified) : undefined,
+        } as MetadataRoute.Sitemap[number];
+    });
+    const pageSitemapEntries = await Promise.all(pageSitemapEntryPromises);
+
     return [
         {
             url: url('/'),
@@ -18,15 +27,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             changeFrequency: 'monthly',
             priority: 0.8,
         },
-        ...source.getPages().map((page) => {
-            const { lastModified } = page.data as { lastModified?: Date };
-
-            return {
-                url: url(page.url),
-                lastModified: lastModified ? new Date(lastModified) : undefined,
-                changeFrequency: 'weekly',
-                priority: 0.5,
-            } as MetadataRoute.Sitemap[number];
-        }),
+        ...pageSitemapEntries,
     ];
 }
