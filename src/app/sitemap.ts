@@ -19,7 +19,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             priority: 0.8,
         },
         ...source.getPages().map((page) => {
-            const { lastModified } = page.data;
+            const { lastModified } = page.data as { lastModified?: Date };
 
             return {
                 url: url(page.url),
