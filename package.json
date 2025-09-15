@@ -1,5 +1,5 @@
 {
-  "name": "bluelink-docs-v2",
+  "name": "bluelink-docs",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -10,20 +10,25 @@
     "lint": "eslint",
     "sync-content": "node scripts/sync-content.mjs",
     "check-links": "node scripts/check-links.mjs",
-    "post-build": "bash scripts/post-build.sh"
+    "post-build": "bash scripts/post-build.sh",
+    "generate-api-docs": "node scripts/generate-api-docs.mjs"
   },
   "dependencies": {
+    "@fumadocs/mdx-remote": "^1.4.0",
     "@headlessui/react": "^2.2.7",
     "@heroicons/react": "^2.2.0",
+    "@scalar/openapi-parser": "^0.20.5",
     "algoliasearch": "^5.37.0",
     "fumadocs-core": "15.7.11",
     "fumadocs-mdx": "11.9.0",
+    "fumadocs-openapi": "^9.3.8",
     "fumadocs-ui": "15.7.11",
     "lucide-react": "^0.543.0",
     "next": "15.5.2",
     "next-validate-link": "^1.6.0",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "shiki": "^3.12.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

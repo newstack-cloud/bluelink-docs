@@ -1,0 +1,5 @@
+{
+  "title": "Authentication",
+  "description": "Authentication for Bluelink components",
+  "pages": ["index", "api-keys", "jwts", "signature-v1"]
+}

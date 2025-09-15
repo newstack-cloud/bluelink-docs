@@ -1,0 +1,5 @@
+{
+  "title": "Blueprints",
+  "description": "Explore the core concepts of blueprint including the blueprint language specification",
+  "pages": ["index", "specification", "core-functions", "links"]
+}

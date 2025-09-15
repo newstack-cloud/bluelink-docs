@@ -1,0 +1,16 @@
+{
+  "title": "Bluelink",
+  "description": "Bluelink project-wide documentation",
+  "icon": "Link",
+  "root": true,
+  "pages": [
+    "---Introduction---",
+    "index",
+    "overview",
+    "---Setup---",
+    "installing-bluelink",
+    "---Core Concepts---",
+    "blueprints",
+    "auth"
+  ]
+}

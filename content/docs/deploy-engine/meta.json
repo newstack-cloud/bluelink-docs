@@ -1,0 +1,7 @@
+{
+  "title": "Deploy Engine",
+  "description": "The application that powers bluelink deployments",
+  "icon": "Rocket",
+  "root": true,
+  "pages": ["index", "http-api-reference"]
+}

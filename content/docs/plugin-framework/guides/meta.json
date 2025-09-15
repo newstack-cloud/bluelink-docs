@@ -1,0 +1,5 @@
+{
+  "title": "Plugin Framework Guides",
+  "description": "Guides for building plugins for the Plugin Framework",
+  "pages": ["developing-plugins", "publishing"]
+}

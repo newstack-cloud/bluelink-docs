@@ -1,0 +1,12 @@
+{
+  "title": "Bluelink CLI",
+  "description": "The CLI for deploying and managing blueprints",
+  "icon": "Terminal",
+  "root": true,
+  "pages": [
+    "getting-started",
+    "configuration",
+    "reference",
+    "deploy-configuration"
+  ]
+}

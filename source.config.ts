@@ -11,6 +11,7 @@ import { remarkAdmonition, remarkSteps } from 'fumadocs-core/mdx-plugins';
 export const docs = defineDocs({
   docs: {
     schema: frontmatterSchema,
+    async: true,
   },
   meta: {
     schema: metaSchema,

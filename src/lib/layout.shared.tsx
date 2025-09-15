@@ -14,7 +14,9 @@ export function baseOptions(): BaseLayoutProps {
     nav: {
       title: (
         <>
-          <Logo width={48} />
+          <div className="logo-container">
+            <Logo width={36} />
+          </div>
           Bluelink
         </>
       ),
@@ -23,7 +25,7 @@ export function baseOptions(): BaseLayoutProps {
     links: [
       {
         text: 'Documentation',
-        url: '/docs',
+        url: '/docs/bluelink',
         secondary: false,
         active: 'nested-url'
       },
@@ -32,6 +34,12 @@ export function baseOptions(): BaseLayoutProps {
         url: '/blog',
         secondary: false,
         active: 'nested-url'
+      },
+      {
+        text: 'Registry',
+        url: 'https://registry.bluelink.dev',
+        secondary: false,
+        external: true,
       }
     ],
   };

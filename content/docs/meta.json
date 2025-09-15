@@ -1,8 +1,10 @@
 {
   "title": "Documentation",
   "pages": [
-    "index",
-    "overview",
-    "installation"
+    "bluelink",
+    "cli",
+    "blueprint-framework",
+    "deploy-engine",
+    "plugin-framework"
   ]
 }

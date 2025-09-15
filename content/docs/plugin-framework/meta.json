@@ -1,0 +1,14 @@
+{
+  "title": "Plugin Framework",
+  "description": "The framework for Deploy Engine provider and transformer plugins",
+  "icon": "Blocks",
+  "root": true,
+  "pages": [
+    "index",
+    "guides",
+    "plugin-system",
+    "provider",
+    "transformer",
+    "registry-protocol-formats"
+  ]
+}

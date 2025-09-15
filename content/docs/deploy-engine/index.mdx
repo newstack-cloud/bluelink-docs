@@ -1,0 +1,43 @@
+---
+title: Introduction
+description: Introduction to the Deploy Engine
+---
+
+The Deploy Engine provides the core functionality for validating and deploying blueprints.
+This powers the CLI and exposes a HTTP API that allows for integration into other tools.
+
+The Deploy Engine is responsible for:
+- Carrying out extensive validation of a blueprint.
+- Change staging, deploying and destroying resources defined in a blueprint.
+
+For the validation and deployment stages, at the centre of the Deploy Engine lies the [Blueprint Framework](/docs/blueprint-framework) which is used to validate and deploy blueprints.
+A blueprint is used to define a Bluelink application in a similar way an AWS SAM template is used to define a serverless application in AWS.
+
+The Deploy Engine contains a collection of resource type providers and other Blueprint Framework plugins that enable Bluelink applications to be deployed to various platforms.
+
+## Installation
+
+The Deploy Engine is included with the Bluelink CLI and other components in a standard install, follow the instructions [here](/docs/framework/installing-bluelink) to install Bluelink.
+
+### Binaries
+
+TODO: Add instructions for downloading and running the binaries for the Deploy Engine API.
+
+### Docker
+
+The Deploy Engine is also available as a Docker image, you can pull the latest version with:
+
+```bash
+docker pull ghcr.io/newstack-cloud/bluelink-deploy-engine:latest
+```
+
+TODO: Add instructions for running the Docker image.
+TODO: Add instructions for a docker compose setup.
+
+## Architecture
+
+The Deploy Engine provides a HTTP API that supports SSE (Server-Sent Events) for streaming events for change staging, validation and deployment. 
+
+The Deploy Engine API facilitates multiple versions of the HTTP API, this allows for backwards compatibility with older clients. The HTTP API version is specified in the URL path, for example `/v1/deploy`. Older versions are slowly deprecated and removed as the deploy engine is updated.
+
+In terms of the composition of the Deploy Engine, it brings together the [Plugin Framework](../../plugin-framework/docs/intro) and [Blueprint Framework](../../blueprint-framework/docs/intro) to provide a powerful and extensible solution for deploying and managing infrastructure as code.

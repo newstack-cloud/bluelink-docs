@@ -1,0 +1,10 @@
+{
+  "title": "Registry Protocols & Formats",
+  "description": "Registry protocols and formats for plugin publishing and discovery",
+  "pages": [
+    "registry-protocol",
+    "auth-protocol",
+    "service-discovery-protocol",
+    "plugin-archive-structure"
+  ]
+}

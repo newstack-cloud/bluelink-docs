@@ -33,7 +33,7 @@ export default function CustomSearchDialog(props: SharedProps) {
         return (
             <SearchDialog
                 search=""
-                onSearchChange={() => {}}
+                onSearchChange={() => { }}
                 isLoading={false}
                 {...props}
             >

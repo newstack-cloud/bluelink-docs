@@ -2,6 +2,8 @@ import defaultMdxComponents from 'fumadocs-ui/mdx';
 import { Heading } from 'fumadocs-ui/components/heading';
 import { icons } from 'lucide-react';
 import type { MDXComponents } from 'mdx/types';
+import { APIPage } from 'fumadocs-openapi/ui';
+import { openapi } from '@/lib/open-api';
 
 // use this function to get MDX components, you will need it for rendering MDX
 export function getMDXComponents(components?: MDXComponents): MDXComponents {
@@ -20,6 +22,9 @@ export function getMDXComponents(components?: MDXComponents): MDXComponents {
     ),
     FieldsHeading,
     FieldHeading,
+    NonLinkableHeading,
+    VersionBadge: (props) => <VersionBadge {...props} />,
+    APIPage: (props) => <APIPage {...openapi.getAPIPageProps(props)} />,
   };
 }
 
@@ -34,4 +39,16 @@ type FieldHeadingProps = {
 
 function FieldHeading({ fieldName }: FieldHeadingProps) {
   return <p className="text-lg font-medium mb-6">{fieldName}</p>;
+}
+
+function NonLinkableHeading({ children }: { children: React.ReactNode }) {
+  return <p className="text-lg font-medium mb-6">{children}</p>;
+}
+
+function VersionBadge({ version }: { version: string }) {
+  return (
+    <div className="flex flex-row gap-2 items-center py-2">
+      <div className="text-sm bg-blue-100 dark:bg-blue-900 rounded-md px-2 py-1 font-medium mb-6">Version {version}</div>
+    </div>
+  );
 }

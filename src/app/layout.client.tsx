@@ -12,7 +12,7 @@ export function Body({
     const mode = useMode();
 
     return (
-        <body className={cn(mode, 'relative flex min-h-screen flex-col prose-a:not([data-card]):text-indigo-600')}>
+        <body className={cn(mode, 'relative flex min-h-screen flex-col prose-a:not([data-card]):text-blue-600')}>
             {children}
         </body>
     );
