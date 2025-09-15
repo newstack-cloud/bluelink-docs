@@ -1,40 +1,41 @@
-import { CloudIcon, RectangleGroupIcon, RocketLaunchIcon } from '@heroicons/react/20/solid'
+import { CloudIcon, RectangleGroupIcon } from '@heroicons/react/20/solid'
+import { BlocksIcon, CodeIcon, ToolCaseIcon } from 'lucide-react'
 import Link from 'next/link'
 
 const features = [
     {
-        name: 'Move Fast',
+        name: 'IaC Simplified',
         description: (
             <>
-                Celerity is designed to help you move fast with its comprehensive
-                set of tools to shorten feedback loops and get you swiftly deploying
-                software you can trust will work.
+                Bluelink makes it much easier to define your infrastructure.
+                Blueprints provider powerful link abstracts where details such as networking and permissions
+                are taken care of while following industry best practices.
             </>
         ),
-        icon: RocketLaunchIcon,
+        icon: CodeIcon,
     },
     {
-        name: 'Run Anywhere with Ease',
+        name: 'Define Your Primitives',
         description: (
             <>
-                Celerity lets you focus on the problems you are trying to solve,
-                you can write your applications once and run them on any cloud provider
-                as containerised or serverless applications.
-                <br />
-                <i>Current cloud provider support will be limited, see the <Link className="text-blue-600 dark:text-blue-400" href="/docs/framework/versions">versions</Link> page for more information.</i>
+                Bluelink supports transformer plugins in addition to the typical providers found commonly in IaC tools.
+                Transformers allow plugin developers to define high level primitives with natively supported abstract
+                resources such as the multi-cloud primitives found in the <a href="https://celerityframework.io" className="text-blue-600 dark:text-blue-400">Celerity</a> project.
             </>
         ),
-        icon: CloudIcon,
+        icon: BlocksIcon,
     },
     {
-        name: 'Build with Useful Primitives',
+        name: 'First-class Tooling',
         description: (
             <>
-                Build with a set of useful primitives focusing on common types of applications
-                such as a REST API, WebSocket API, Workflow or a Pub/Sub Consumer.
+                Bluelink comes with everything you need to set you up for success with your IaC projects,
+                including a delightful CLI and a language server that integrates with your editor of choice.
+                These tools have a tight integration with provider and transformer plugins used for your projects
+                that will set you in the right direction.
             </>
         ),
-        icon: RectangleGroupIcon,
+        icon: ToolCaseIcon,
     },
 ]
 
@@ -43,12 +44,12 @@ export default function Features() {
         <div className="pt-24 pb-32 sm:pt-32 sm:pb-48">
             <div className="mx-auto max-w-7xl px-6 lg:px-8">
                 <div className="mx-auto max-w-2xl lg:text-center">
-                    <h2 className="text-base/7 font-semibold text-blue-600 dark:text-blue-400" id="features">Build with freedom</h2>
+                    <h2 className="text-base/7 font-semibold text-blue-600 dark:text-blue-400" id="features">removing burdens</h2>
                     <p className="mt-2 text-pretty text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl lg:text-balance dark:text-white">
-                        Leave cloud lock-in behind
+                        Networking and permissions figured out for you
                     </p>
                     <p className="mt-6 text-lg/8 text-gray-600 dark:text-gray-300">
-                        Swiftly build your backend applications using essential building blocks without being locked into a specific cloud provider.
+                        Define your infrastructure in code, link key resources together and let Bluelink handle the rest.
                     </p>
                 </div>
                 <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-none">
@@ -68,7 +69,7 @@ export default function Features() {
                 </div>
                 <div className="mt-20 flex items-center justify-center gap-x-6">
                     <Link
-                        href="/docs/framework/overview"
+                        href="/docs/bluelink/overview"
                         className="rounded-md bg-blue-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:bg-blue-500 dark:hover:bg-blue-400 dark:focus-visible:outline-blue-500"
                     >
                         Read the overview
