@@ -30,3 +30,11 @@ You can explore values that can be configured in the [CLI reference](/docs/cli/r
 The CLI can be configured using environment variables.
 Environment variables prefixed with `BLUELINK_CLI_` will be picked up by the CLI.
 You can explore environment variables that can be configured in the [CLI reference](/docs/cli/reference).
+
+## Auth Configuration File
+
+Depending on the authentication method configured for the CLI, you will need to provide a separate configuration file
+for authenticating with the Deploy Engine.
+
+By default, the CLI will look for a configuration file at `<rootDir>/engine.auth.json`, this can be overridden using
+the [`--engine-auth-config-file` option](/docs/cli/reference#--engine-auth-config-file).

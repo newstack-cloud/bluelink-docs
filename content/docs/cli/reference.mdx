@@ -9,9 +9,9 @@ Options that are marked with a `boolean` type are command line flags that do not
 
 ## Global Options
 
-:::note
+<Callout title="Note" type="info">
 CLI options take precedence over [configuration](/docs/cli/configuration) from environment variables and values from a configuration file.
-:::
+</Callout>
 
 ### `--config`
 
@@ -67,6 +67,21 @@ To use a `unix` socket on windows, you will need to use WSL 2 or above.
 **Default Value**: `http://localhost:8325`
 
 The endpoint of the deploy engine api, this is used if `--connect-protocol` is set to `tcp`.
+
+### `--engine-auth-config-file`
+
+**Environment Variable**: `BLUELINK_CLI_ENGINE_AUTH_CONFIG_FILE`
+
+**Configuration Key**: `engineAuthConfigFile`
+
+**Type**: `string`
+
+**Default Value**: `engine.auth.json`
+
+The path to the authentication configuration file for the deploy engine.
+This is used to authenticate with the deploy engine when using the `stage-changes`, `deploy`, `destroy` and `validate` commands.
+
+See the [Auth Configuration](/docs/cli/auth-configuration) documentation for more information on what is expected to be present in this file.
 
 ## `help`
 

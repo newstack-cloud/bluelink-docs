@@ -112,10 +112,10 @@ An example of a `bluelink-registry-info.json` file with dependencies would look 
 }
 ```
 
-:::note About Dependency Locking
+<Callout title="About Dependency Locking" type="info">
 As plugins are **not** source code libraries, they will not be used in building a software artifact or for resolving dependencies in a language runtime/interpreter. For this reason, the Plugin Framework does not support dependency locking.
 If you need to ensure that an exact version of a dependency is used in the plugin that you are developing, you must specify the exact version (e.g. `1.0.0`) in the `dependencies` map.
-:::
+</Callout>
 
 ## Plugin Service
 

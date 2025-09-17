@@ -40,10 +40,10 @@ The message is created by concatenating the public key of a key pair, a special 
 
 `{timestamp}` is a unix timestamp in seconds.
 
-:::warning header name case
+<Callout title="Header name case" type="warning">
 The header names in the message must be in lowercase when creating the message.
 The request headers should be looked up in a case-insensitive manner when verifying the signature.
-:::
+</Callout>
 
 ### Signature
 
@@ -77,16 +77,16 @@ Bluelink-Signature-V1: keyId="{keyId}", headers="bluelink-date {header1-name} ..
 
 All the headers listed and used to create the signature must be present in the HTTP request.
 
-:::warning Order of parts in the header value
+<Callout title="Order of parts in the header value" type="warning">
 The parts of the `Bluelink-Signature-V1` header must be in the following order:
 1. `keyId`
 2. `headers`
 3. `signature`
-:::
+</Callout>
 
-:::warning Header name case
+<Callout title="Header name case" type="warning">
 All header names must be in lowercase in the `headers` part of the `Bluelink-Signature-V1` header.
-:::
+</Callout>
 
 ### Verifying the Signature
 
