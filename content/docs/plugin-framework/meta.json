@@ -9,6 +9,7 @@
     "plugin-system",
     "provider",
     "transformer",
-    "registry-protocol-formats"
+    "sdk",
+    "registry-protocols-formats"
   ]
 }
