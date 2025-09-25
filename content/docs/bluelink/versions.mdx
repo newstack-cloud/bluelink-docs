@@ -1,0 +1,59 @@
+---
+title: Bluelink Versions
+description: Overview of Bluelink versions and feature evolution
+---
+
+Bluelink is a collection of multiple software components that work together to provide a best-in-class infrastructure management experience. The capabilities available depend on which components are implemented and to what degree.
+
+This section provides an overview of the versioning strategy for Bluelink spanning multiple software components and registry features. The term "Ecosystem" is used to refer to the entire Bluelink project.
+
+## Version Strategy
+
+### v0 (Current) - Evolving Capabilities
+**Initial Release**: December 1st, 2025  
+**Evolution Period**: December 2025 - November 2026
+
+v0 represents the initial release of Bluelink with a full set of capabilities with a core set of plugins that will be continuously expanded until the release of v1.
+
+The current v0 release supports managing infrastructure for a subset of AWS services:
+
+#### Current v0 Components (December 2025)
+- **Bluelink CLI**: Full set of commands for validating, change staging, deploying blueprints and managing plugins.
+- **Deploy Engine**: The engine that powers validation, change staging and deployments.
+- **Plugin Framework**: The framework that powers the plugin system, providing an SDK to build Bluelink plugins with Go.
+- **Blueprint Language Server**: Diagnostics, validation and auto-complete support for blueprints.
+- **AWS Provider (Subset)**: The provider plugin that powers the management of resources, links, data sources and variables for AWS services,
+    initially supporting a subset of AWS resources that are required to power [Celerity v0](https://celerityframework.io/docs/framework/versions).
+- **Celerity Transformer**: The transformer plugin that powers the transformation of Celerity application resources into concrete resources in multiple target environments.
+    In v0, this will only support the transformation of Celerity application resources into concrete resources in AWS required for [Celerity v0](https://celerityframework.io/docs/framework/versions).
+
+#### Core Plugin Cloud Provider Support
+- **AWS only** (initially)
+
+### v1 (Preview) - Full Capabilities
+**Target Release**: November 2026
+
+v1 represents the full vision for Bluelink with complete multi-cloud capabilities:
+
+#### Supported Components
+- **Bluelink CLI**: Full set of commands for validating, change staging, deploying blueprints and managing plugins.
+- **Deploy Engine**: The engine that powers validation, change staging and deployments.
+- **Plugin Framework**: The framework that powers the plugin system, providing an SDK to build Bluelink plugins with Go.
+- **Blueprint Language Server**: Diagnostics, validation and auto-complete support for blueprints.
+- **AWS Provider**: The provider that powers the management of a subset of AWS services,
+    mainly focusing on the core services that are required to power [Celerity v1](https://celerityframework.io/docs/framework/versions).
+- **Azure Provider**: The provider that powers the management of a subset of Azure services,
+    mainly focusing on the core services that are required to power [Celerity v1](https://celerityframework.io/docs/framework/versions).
+- **Google Cloud Provider**: The provider that powers the management of a subset of Google Cloud services,
+    mainly focusing on the core services that are required to power [Celerity v1](https://celerityframework.io/docs/framework/versions).
+- **Celerity Transformer**: The transformer plugin that powers the transformation of Celerity application resources into concrete resources in multiple target environments.
+    In v1, this will support the transformation of Celerity application resources into concrete resources in AWS, Azure and Google Cloud required for [Celerity v1](https://celerityframework.io/docs/framework/versions).
+
+#### Core Plugin Cloud Provider Support
+- **AWS** - Coverage of core AWS services
+- **Azure** - Coverage of core Azure services
+- **Google Cloud** - Coverage of core Google Cloud services
+
+## Migration Path
+
+Users can start with v0 and gradually adopt new features as they become available. The documentation will be updated to reflect the current state while maintaining visibility into the full vision for v1.

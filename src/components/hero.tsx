@@ -23,7 +23,7 @@ export default function Hero() {
                     <div className="hidden sm:mb-8 sm:flex sm:justify-center">
                         <div className="relative rounded-full px-3 py-1 text-sm/6 text-gray-600 ring-1 ring-gray-900/10 hover:ring-gray-900/20 dark:text-gray-400 dark:ring-white/10 dark:hover:ring-white/20">
                             Bluelink v0 is coming in December 2025.{' '}
-                            <Link href="/docs/framework/versions" className="font-semibold text-blue-600 dark:text-blue-400">
+                            <Link href="/docs/bluelink/versions" className="font-semibold text-blue-600 dark:text-blue-400">
                                 <span aria-hidden="true" className="absolute inset-0" />
                                 Read more <span aria-hidden="true">&rarr;</span>
                             </Link>
