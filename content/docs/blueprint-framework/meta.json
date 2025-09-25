@@ -3,5 +3,5 @@
   "description": "The core framework for validating and deploying blueprints",
   "icon": "File",
   "root": true,
-  "pages": ["index"]
+  "pages": ["index", "architecture", "errors"]
 }

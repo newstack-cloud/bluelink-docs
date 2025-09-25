@@ -1,0 +1,996 @@
+---
+title: Errors
+description: Errors returned by the Blueprint Framework for validation, change staging and deployments
+---
+
+The blueprint framework returns a collection of specific error types for validation, change staging and deployments.
+A subset of these errors contain rich context that can be used to help tools such as the CLI or language server to provide
+actionable feedback to the user.
+
+## Validation Errors
+
+Validation errors are returned when the blueprint framework is unable to load a blueprint document.
+
+Multiple Go error types can be returned for validation errors, these include:
+- [`errors.LoadError`](https://pkg.go.dev/github.com/newstack-cloud/bluelink/libs/blueprint/errors#LoadError) - A load error related to validation will be returned due to a file system error, a malformed blueprint document or 
+    errors in the blueprint as per the [specification](/docs/bluelink/blueprints/specification).
+- [`errors.RunError`](https://pkg.go.dev/github.com/newstack-cloud/bluelink/libs/blueprint/errors#RunError) - A run error related to validation will be returned due to configuration issues, missing element types or plugins.
+    For example, a run error will be returned if the resource type `aws/lambda/function` is used but an `aws` plugin is not installed.
+
+## Deployment Errors
+
+Deployment errors are returned when the blueprint framework fails when trying to deploy or destroy a loaded blueprint instance.
+
+The [`errors.RunError`](https://pkg.go.dev/github.com/newstack-cloud/bluelink/libs/blueprint/errors#RunError) Go error type is used for most runtime errors with some exceptions where plain Go errors are returned.
+
+## Error Context
+
+The `errors.LoadError` and `errors.RunError` types include a `Context` field that can be used to provide additional structured context
+to produce error messages with actionable feedback.
+The context object consists of an error category, a reason code, a list of suggested actions and a free-form metadata object
+that can be used by tools to enhance error output.
+
+See the [Go documentation](https://pkg.go.dev/github.com/newstack-cloud/bluelink/libs/blueprint/errors#ErrorContext) for the error context type, supported [action types](https://pkg.go.dev/github.com/newstack-cloud/bluelink/libs/blueprint/errors#ActionType) and [error categories](https://pkg.go.dev/github.com/newstack-cloud/bluelink/libs/blueprint/errors#ErrorCategory).
+
+### Reason Codes and Metadata
+
+The `errors.LoadError` and `errors.RunError` types can contain metadata that can be used to provide additional context to error messages and actions.
+This section details the metadata available for errors based on the reason code.
+The following error reason codes are a subset of all errors that can occur in the blueprint framework, a lot of errors such as those for the
+substitution engine will only return messages to be used in diagnostics.
+
+_It's important to note that all metadata fields are optional and may not be present for all instances of an error with a given reason code._
+
+
+You can see the Go const mappings for error reason codes in the following locations:
+- [container](https://pkg.go.dev/github.com/newstack-cloud/bluelink/libs/blueprint/container#pkg-constants)
+- [provider](https://pkg.go.dev/github.com/newstack-cloud/bluelink/libs/blueprint/provider#pkg-constants)
+- [includes](https://pkg.go.dev/github.com/newstack-cloud/bluelink/libs/blueprint/includes#pkg-constants)
+- [resourcehelpers](https://pkg.go.dev/github.com/newstack-cloud/bluelink/libs/blueprint/resourcehelpers#pkg-constants)
+- [serialisation](https://pkg.go.dev/github.com/newstack-cloud/bluelink/libs/blueprint/serialisation#pkg-constants)
+- [specmerge](https://pkg.go.dev/github.com/newstack-cloud/bluelink/libs/blueprint/specmerge#pkg-constants)
+- [subengine](https://pkg.go.dev/github.com/newstack-cloud/bluelink/libs/blueprint/subengine#pkg-constants)
+- [substitutions](https://pkg.go.dev/github.com/newstack-cloud/bluelink/libs/blueprint/substitutions#pkg-constants)
+- [validation](https://pkg.go.dev/github.com/newstack-cloud/bluelink/libs/blueprint/validation#pkg-constants)
+
+<br/>
+
+#### provider_not_found
+
+`provider.ErrorReasonCodeItemTypeProviderNotFound`
+
+The error code used when a resource type, data source type or variable typeis not found in the provider.
+
+**Category:** `provider`
+
+**Available Metadata**
+
+providerNamespace (string) - The namespace of the provider that the item type is not found in.
+
+category (string) - The category of the item that is not found in the provider. Can be one of `resource`, `dataSource` or `variable`.
+
+itemType (string) - The type of the item that is not found in the provider.
+
+<br/>
+
+#### invalid_resource
+
+`validation.ErrorReasonCodeInvalidResource`
+
+A generic error code used when a resource is invalid, this will be returned when
+a resource is invalid due to a validation error that has no specific reason code of its own.
+
+**Category:** `validation`
+
+**Available Metadata**
+
+resourceName (string) - The name of the resource that is invalid.
+
+resourceType (string) - The type of the resource that is invalid.
+
+path (string) - The path to the invalid resource or an invalid field in the resource spec.
+
+**_Other metadata may be present depending on the validation error that occurred._**
+
+<br/>
+
+#### resource_type_not_found
+
+`resourcehelpers.ErrorReasonCodeProviderResourceTypeNotFound`
+
+The error code used when a resource type is not found in the provider.
+
+**Category:** `resourceType`
+
+**Available Metadata**
+
+providerNamespace (string) - The namespace of the provider that the resource type is not found in.
+
+resourceType (string) - The type of the resource that is not found in the provider.
+
+<br/>
+
+#### abstract_resource_type_not_found
+
+`resourcehelpers.ErrorReasonCodeAbstractResourceTypeNotFound`
+
+The error code used when an abstract resource type is not found in any of the loaded transformers.
+
+**Category:** `resourceType`
+
+**Available Metadata**
+
+abstractResourceType (string) - The type of the abstract resource that is not found in any of the loaded transformers.
+
+<br/>
+
+#### resource_type_spec_def_missing
+
+`validation.ErrorReasonCodeResourceTypeSpecDefMissing`
+
+The error code used when a resource type spec definition is missing.
+This indicates an issue in the provider or transformer plugin that provides a specific resource type
+and that the developer will need to correct the issue.
+
+**Category:** `resourceType`
+
+**Available Metadata**
+
+resourceName (string) - The name of the resource that has a missing spec definition.
+
+resourceType (string) - The type of the resource that has a missing spec definition.
+
+<br/>
+
+#### resource_type_spec_def_missing_schema
+
+`validation.ErrorReasonCodeResourceTypeSpecDefMissingSchema`
+
+The error code used when a resource type spec definition is missing a schema.
+This indicates an issue in the provider or transformer plugin that provides a specific resource type
+and that the developer will need to correct the issue.
+
+**Category:** `resourceType`
+
+**Available Metadata**
+
+resourceName (string) - The name of the resource that has a missing spec definition.
+
+resourceType (string) - The type of the resource that has a missing spec definition.
+
+<br/>
+
+#### resource_def_item_empty
+
+`validation.ErrorReasonCodeResourceDefItemEmpty`
+
+The error code used when an empty value is provided for an entire resource spec or for an empty item
+in an array or map.
+
+_This is different from the `resource_def_missing_required_field` error code which only applies to fields in a structured object._
+
+**Category:** `resourceType`
+
+**Available Metadata**
+
+resourceType (string) - The type of the resource that has an unexpected empty value.
+
+path (string) - The path to the invalid resource or an invalid field in the resource spec.
+
+resourceSpecType (string) - The expected type of an invalid field in the resource spec.
+
+<br/>
+
+#### resource_def_invalid_type
+
+`validation.ErrorReasonCodeResourceDefInvalidType`
+
+The error code used when an invalid type is provided for an item in a resource spec.
+
+**Category:** `resourceType`
+
+**Available Metadata**
+
+resourceType (string) - The type of the resource that has an invalid value type.
+
+path (string) - The full path to the invalid field.
+
+actualType (string) - The actual, invalid type provided for the field in the resource spec.
+
+expectedType (string) - The expected type of the field in the resource spec.
+
+<br/>
+
+#### resource_def_missing_required_field
+
+`validation.ErrorReasonCodeResourceDefMissingRequiredField`
+
+The error code used when a required field is missing from a resource spec object.
+
+**Category:** `resourceType`
+
+**Available Metadata**
+
+resourceType (string) - The type of the resource that has a missing required field.
+
+path (string) - The full path to the missing required field.
+
+missingField (string) - The name of the required field that is missing from the resource spec.
+
+<br/>
+
+#### resource_def_unknown_field
+
+`validation.ErrorReasonCodeResourceDefUnknownField`
+
+The error code used when an unknown field is provided for an item in a resource spec.
+
+**Category:** `resourceType`
+
+**Available Metadata**
+
+resourceType (string) - The type of the resource that has an unknown field.
+
+path (string) - The full path to the unknown field.
+
+unknownField (string) - The name of the unknown field that is provided in the resource spec.
+
+<br/>
+
+#### resource_def_union_item_empty
+
+`validation.ErrorReasonCodeResourceDefUnionItemEmpty`
+
+The error code used when an unexpected empty value is provided for an item that can be one of several types.
+
+**Category:** `resourceType`
+
+**Available Metadata**
+
+resourceType (string) - The type of the resource that has an unexpected empty value.
+
+path (string) - The path to the invalid field in the resource spec.
+
+unionType (string) - A string representation of the union type that the item can be one of (e.g. `string | object`).
+
+<br/>
+
+#### resource_def_union_invalid_type
+
+`validation.ErrorReasonCodeResourceDefUnionInvalidType`
+
+The error code used when an invalid type is provided for an item that can be one of several types.
+
+**Category:** `resourceType`
+
+**Available Metadata**
+
+resourceType (string) - The type of the resource that has an invalid value type.
+
+path (string) - The path to the invalid field in the resource spec.
+
+unionType (string) - A string representation of the union type that the item can be one of (e.g. `string | object`).
+
+#### resource_def_not_allowed_value
+
+`validation.ErrorReasonCodeResourceDefNotAllowedValue`
+
+The error code used when an invalid value is provided for an item that can be one of a list of allowed values.
+
+**Category:** `resourceType`
+
+**Available Metadata**
+
+resourceType (string) - The type of the resource that has an invalid value.
+
+path (string) - The path to the invalid field in the resource spec.
+
+allowedValuesText (string) - A string representation of the allowed values for the field.
+
+<br/>
+
+#### resource_def_pattern_constraint_failure
+
+`validation.ErrorReasonCodeResourceDefPatternConstraintFailure`
+
+The error code used when a value does not match the pattern constraint for a field.
+
+**Category:** `resourceType`
+
+**Available Metadata**
+
+resourceType (string) - The type of the resource that has a pattern constraint failure.
+
+path (string) - The path to the invalid field in the resource spec.
+
+pattern (string) - The pattern that the value does not match.
+
+<br/>
+
+#### resource_def_min_constraint_failure
+
+`validation.ErrorReasonCodeResourceDefMinConstraintFailure`
+
+The error code used when a value does not meet the minimum constraint for a field.
+
+**Category:** `resourceType`
+
+**Available Metadata**
+
+resourceType (string) - The type of the resource that has a minimum constraint failure.
+
+path (string) - The path to the invalid field in the resource spec.
+
+value (string) - The value that does not meet the minimum constraint.
+
+minimum (string) - The minimum value that the field does not meet.
+
+<br/>
+
+#### resource_def_max_constraint_failure
+
+`validation.ErrorReasonCodeResourceDefMaxConstraintFailure`
+
+The error code used when a value does not meet the maximum constraint for a field.
+
+**Category:** `resourceType`
+
+**Available Metadata**
+
+resourceType (string) - The type of the resource that has a maximum constraint failure.
+
+path (string) - The path to the invalid field in the resource spec.
+
+value (string) - The value that does not meet the maximum constraint.
+
+maximum (string) - The maximum value that the field does not meet.
+
+<br/>
+
+#### resource_def_complex_min_length_constraint_failure
+
+`validation.ErrorReasonCodeResourceDefComplexMinLengthConstraintFailure`
+
+The error code used when a value does not meet the minimum length constraint for a field.
+
+**Category:** `resourceType`
+
+**Available Metadata**
+
+resourceType (string) - The type of the resource that has a minimum length constraint failure.
+
+path (string) - The path to the invalid field in the resource spec.
+
+schemaType (string) - The type of the schema that the value does not meet the minimum length constraint for.
+
+valueLength (int) - The length of the value that does not meet the minimum length constraint.
+
+minimumLength (int) - The minimum length that the value does not meet.
+
+<br/>
+
+#### resource_def_complex_max_length_constraint_failure
+
+`validation.ErrorReasonCodeResourceDefComplexMaxLengthConstraintFailure`
+
+The error code used when a value does not meet the maximum length constraint for a field.
+
+**Category:** `resourceType`
+
+**Available Metadata**
+
+resourceType (string) - The type of the resource that has a maximum length constraint failure.
+
+path (string) - The path to the invalid field in the resource spec.
+
+schemaType (string) - The type of the schema that the value does not meet the maximum length constraint for.
+
+valueLength (int) - The length of the value that does not meet the maximum length constraint.
+
+maximumLength (int) - The maximum length that the value does not meet.
+
+<br/>
+
+#### resource_def_string_min_length_constraint_failure
+
+`validation.ErrorReasonCodeResourceDefStringMinLengthConstraintFailure`
+
+The error code used when a value does not meet the minimum length constraint for a string field.
+
+**Category:** `resourceType`
+
+**Available Metadata**
+
+resourceType (string) - The type of the resource that has a minimum length constraint failure.
+
+path (string) - The path to the invalid field in the resource spec.
+
+numberOfChars (int) - The number of characters in the value that does not meet the minimum length constraint.
+
+minimumLength (int) - The minimum length that the value does not meet.
+
+<br/>
+
+#### resource_def_string_max_length_constraint_failure
+
+`validation.ErrorReasonCodeResourceDefStringMaxLengthConstraintFailure`
+
+The error code used when a value does not meet the maximum length constraint for a string field.
+
+**Category:** `resourceType`
+
+**Available Metadata**
+
+resourceType (string) - The type of the resource that has a maximum length constraint failure.
+
+path (string) - The path to the invalid field in the resource spec.
+
+numberOfChars (int) - The number of characters in the value that does not meet the maximum length constraint.
+
+maximumLength (int) - The maximum length that the value does not meet.
+
+<br/>
+
+#### invalid_resource_spec_def
+
+`validation.ErrorReasonCodeInvalidResourceSpecDefinition`
+
+The error code used when a resource spec schema contains invalid schema types.
+This indicates an issue in the provider or transformer plugin that provides a specific resource type
+implementation.
+
+**Category:** `resourceType`
+
+**Available Metadata**
+
+resourceType (string) - The type of the resource that has an invalid schema type.
+
+invalidSchemaType (string) - The invalid schema type that is present in the resource schema.
+
+pluginNamespace (string) - The namespace of the plugin that provides the resource type implementation.
+
+<br/>
+
+#### missing_transformers
+
+`validation.ErrorReasonMissingTransformers`
+
+The error code used when transformers defined in a blueprint are not installed.
+
+**Category:** `transformer`
+
+**Available Metadata**
+
+missingTransformers (array[string]) - A list of transformers that are not installed.
+
+<br/>
+
+#### missing_transformer
+
+`validation.ErrorReasonMissingTransformer`
+
+The error code used when a transformer is not installed.
+
+**Category:** `transformer`
+
+**Available Metadata**
+
+missingTransformer (string) - The name of the transformer that is not installed.
+
+<br/>
+
+#### variable_validation_errors
+
+`validation.ErrorReasonCodeVariableValidationErrors`
+
+The generic error code used when there are validation errors for a variable,
+this is primarily used for missing variable types and parent errors that contain more specific child errors.
+
+**Category:** `variableType`
+
+**Available Metadata**
+
+variableName (string) - The name of the variable that has validation errors.
+
+variableType (string) - The type of the variable that has validation errors.
+
+providerNamespace (string) - The namespace of the provider of a custom variable type that has validation errors.
+
+<br/>
+
+#### variable_invalid_default_value
+
+`validation.ErrorReasonCodeVariableInvalidDefaultValue`
+
+The error code used when a default value is invalid for a variable.
+
+**Category:** `variableType`
+
+**Available Metadata**
+
+variableName (string) - The name of the variable that has an invalid default value.
+
+expectedType (string) - The expected type of the variable that has an invalid default value.
+
+actualType (string) - The actual provided default value type.
+
+<br/>
+
+#### variable_empty_default_value
+
+`validation.ErrorReasonCodeVariableEmptyDefaultValue`
+
+The error code used when an empty default value is provided for a variable.
+
+**Category:** `variableType`
+
+**Available Metadata**
+
+variableName (string) - The name of the variable that has an empty default value.
+
+variableType (string) - The type of the variable that has an empty default value.
+
+<br/>
+
+#### variable_invalid_or_missing
+
+`validation.ErrorReasonCodeVariableInvalidOrMissing`
+
+The error code used when a variable is of an invalid type or is missing.
+
+**Category:** `variableType`
+
+**Available Metadata**
+
+variableName (string) - The name of the variable that is invalid or missing.
+
+variableType (string) - The type of the variable that is invalid or missing.
+
+actualType (string) - The actual type of the value provided for the variable.
+
+<br/>
+
+#### variable_empty_value
+
+`validation.ErrorReasonCodeVariableEmptyValue`
+
+The error code used when an empty value is provided for a variable.
+
+**Category:** `variableType`
+
+**Available Metadata**
+
+variableName (string) - The name of the variable that has an empty value.
+
+variableType (string) - The type of the variable that has an empty value.
+
+<br/>
+
+#### variable_invalid_allowed_value
+
+`validation.ErrorReasonCodeVariableInvalidAllowedValue`
+
+The error code used when an invalid value is provided for the set of allowed values for a variable.
+For example, this error can occur when a variable is a integer and an allowed value provided is a string.
+
+**Category:** `variableType`
+
+**Available Metadata**
+
+variableType (string) - The type of the variable that has an invalid allowed value.
+
+allowedValueType (string) - The type of the allowed value that is invalid.
+
+allowedValue (string) - The allowed value that is invalid.
+
+<br/>
+
+#### variable_null_allowed_value
+
+`validation.ErrorReasonCodeVariableNullAllowedValue`
+
+The error code used when a null value is provided for the set of allowed values for a variable.
+
+**Category:** `variableType`
+
+**Available Metadata**
+
+variableType (string) - The type of the variable that has a null allowed value.
+
+<br/>
+
+#### variable_invalid_allowed_values_not_supported
+
+`validation.ErrorReasonCodeVariableInvalidAllowedValuesNotSupported`
+
+The error code used when a set of allowed values is provided for a variable type that
+does not support allowed values.
+For example, a boolean variable type does not support allowed values.
+
+**Category:** `variableType`
+
+**Available Metadata**
+
+variableName (string) - The name of the variable that does not support allowed values.
+
+variableType (string) - The type of the variable that does not support allowed values.
+
+<br/>
+
+#### variable_value_not_allowed
+
+`validation.ErrorReasonCodeVariableValueNotAllowed`
+
+The error code used when a value is not allowed for a variable.
+
+**Category:** `variableType`
+
+**Available Metadata**
+
+variableName (string) - The name of the variable that has a value that is not allowed.
+
+variableType (string) - The type of the variable that has a value that is not allowed.
+
+valueLabel (string) - The label of the value for the variable indicating whether the value is for a default value or a runtime value.
+
+allowedValuesText (string) - A string representation of the allowed values for the variable.
+
+<br/>
+
+#### custom_variable_value_not_in_options
+
+`validation.ErrorReasonCodeCustomVarValueNotInOptions`
+
+The error code used when a value is not in the set of options for a custom variable type.
+
+**Category:** `variableType`
+
+**Available Metadata**
+
+variableName (string) - The name of the variable that has a value that is not in the set of options.
+
+variableType (string) - The type of the variable that has a value that is not in the set of options.
+
+<br/>
+
+#### required_variable_missing
+
+`validation.ErrorReasonCodeRequiredVariableMissing`
+
+The error code used when a required variable is missing.
+
+**Category:** `variableType`
+
+**Available Metadata**
+
+variableName (string) - The name of the variable that is missing.
+
+<br/>
+
+#### mixed_variable_types
+
+`validation.ErrorReasonCodeMixedVariableTypes`
+
+The error code used when a custom variable type has mixed types
+in the returned options list.
+
+**Category:** `variableType`
+
+**Available Metadata**
+
+variableName (string) - The name of the variable that has mixed types in options.
+
+variableType (string) - The type of the variable that has mixed types in options.
+
+<br/>
+
+#### custom_variable_allowed_values_not_in_options
+
+`validation.ErrorReasonCodeCustomVarAllowedValuesNotInOptions`
+
+The error code used when a variable with a custom type has allowed values that are not in the options list.
+
+**Category:** `variableType`
+
+**Available Metadata**
+
+variableName (string) - The name of the variable that has allowed values that are not in the options list.
+
+variableType (string) - The type of the variable that has allowed values that are not in the options list.
+
+<br/>
+
+#### custom_variable_default_value_not_in_options
+
+`validation.ErrorReasonCodeCustomVarDefaultValueNotInOptions`
+
+The error code used when a default value is not in the options list for a custom variable type.
+
+**Category:** `variableType`
+
+**Available Metadata**
+
+variableName (string) - The name of the variable that has a default value that is not in the options list.
+
+variableType (string) - The type of the variable that has a default value that is not in the options list.
+
+<br/>
+
+#### custom_variable_type_not_found
+
+`provider.ErrorReasonCodeProviderCustomVariableTypeNotFound`
+
+The error code used when a custom variable type is not found in the provider.
+
+**Category:** `variableType`
+
+**Available Metadata**
+
+providerNamespace (string) - The namespace of the provider that the custom variable type is not found in.
+
+variableType (string) - The type of the custom variable that is not found in the provider.
+
+<br/>
+
+#### missing_export_type
+
+`validation.ErrorReasonCodeMissingExportType`
+
+The error code used when an export type is missing.
+
+**Category:** `export`
+
+**Available Metadata**
+
+exportName (string) - The name of the export that has a missing type.
+
+<br/>
+
+#### invalid_export_type
+
+`validation.ErrorReasonCodeInvalidExportType`
+
+The error code used when an export type is invalid.
+
+**Category:** `export`
+
+**Available Metadata**
+
+exportName (string) - The name of the export that has an invalid type.
+exportType (string) - The invalid type for the export.
+validExportTypes (array[string]) - A list of valid export types.
+
+<br/>
+
+#### empty_export_field
+
+`validation.ErrorReasonCodeEmptyExportField`
+
+The error code used when an export field is empty.
+
+**Category:** `export`
+
+**Available Metadata**
+
+exportName (string) - The name of the export that has an empty field.
+
+<br/>
+
+#### data_source_spec_def_missing
+
+`validation.ErrorReasonCodeDataSourceSpecDefMissing`
+
+The error code used when a data source spec definition is missing.
+This indicates an issue in the provider or transformer plugin that provides a specific data source type
+and that the developer will need to correct the issue.
+
+**Category:** `dataSourceType`
+
+**Available Metadata**
+
+dataSourceName (string) - The name of the data source that has a missing spec definition.
+
+dataSourceType (string) - The type of the data source that has a missing spec definition.
+
+<br/>
+
+#### data_source_missing_filter
+
+`validation.ErrorReasonCodeDataSourceMissingFilter`
+
+The error code used when a data source is missing a filter.
+
+**Category:** `dataSourceType`
+
+**Available Metadata**
+
+dataSourceName (string) - The name of the data source that is missing a filter.
+
+<br/>
+
+#### data_source_empty_filter
+
+`validation.ErrorReasonCodeDataSourceEmptyFilter`
+
+The error code used when a data source has an empty filter.
+
+**Category:** `dataSourceType`
+
+**Available Metadata**
+
+dataSourceName (string) - The name of the data source that has an empty filter.
+
+<br/>
+
+#### data_source_missing_filter_field
+
+`validation.ErrorReasonCodeDataSourceMissingFilterField`
+
+The error code used when a data source filter is missing a field.
+
+**Category:** `dataSourceType`
+
+**Available Metadata**
+
+dataSourceName (string) - The name of the data source that is missing a filter field.
+
+<br/>
+
+#### data_source_missing_filter_search
+
+`validation.ErrorReasonCodeDataSourceMissingFilterSearch`
+
+The error code used when a data source filter is missing a search value.
+
+**Category:** `dataSourceType`
+
+**Available Metadata**
+
+dataSourceName (string) - The name of the data source that is missing a search value.
+
+<br/>
+
+#### data_source_missing_exports
+
+`validation.ErrorReasonCodeDataSourceMissingExports`
+
+The error code used when a data source is missing exported fields.
+
+**Category:** `dataSourceType`
+
+**Available Metadata**
+
+dataSourceName (string) - The name of the data source that is missing exported fields.
+
+<br/>
+
+#### data_source_filter_conflict
+
+`validation.ErrorReasonCodeDataSourceFilterConflict`
+
+The error code used when a data source filter has a conflict.
+This usually occurs when a data source filter is defined with multiple fields that conflict with each other
+as they may represent different identifiers for the same resource.
+
+**Category:** `dataSourceType`
+
+**Available Metadata**
+
+dataSourceName (string) - The name of the data source that has a filter conflict.
+
+fieldName (string) - The name of the field that has a conflict.
+
+otherFieldName (string) - The name of the other field that the current field conflicts with.
+
+<br/>
+
+#### invalid_data_source_filter_operator
+
+`validation.ErrorReasonCodeInvalidDataSourceFilterOperator`
+
+The error code used when a data source filter has an invalid operator.
+
+**Category:** `dataSourceType`
+
+**Available Metadata**
+
+dataSourceName (string) - The name of the data source that has an invalid operator.
+
+filterOperator (string) - The invalid operator for the data source filter.
+
+<br/>
+
+#### unsupported_data_source_filter_operator
+
+`validation.ErrorReasonCodeUnsupportedDataSourceFilterOperator`
+
+The error code used when a data source filter has an unsupported operator.
+
+**Category:** `dataSourceType`
+
+**Available Metadata**
+
+dataSourceName (string) - The name of the data source that has an unsupported operator.
+
+filterOperator (string) - The unsupported operator for the data source filter.
+
+filterFieldName (string) - The name of the field that the filter with the unsupported operator is defined for.
+
+<br/>
+
+#### invalid_data_source_field_type
+
+`validation.ErrorReasonCodeInvalidDataSourceFieldType`
+
+The error code used when a data source filter has an invalid exported field type.
+
+**Category:** `dataSourceType`
+
+**Available Metadata**
+
+dataSourceName (string) - The name of the data source that has an invalid field type.
+
+exportName (string) - The name of the field that the filter with the invalid field type is defined for.
+
+<br/>
+
+#### data_source_filter_field_not_supported
+
+`validation.ErrorReasonCodeDataSourceFilterFieldNotSupported`
+
+The error code used when a field is specified to be used as a data source filter
+when it can't be used for filtering.
+
+**Category:** `dataSourceType`
+
+**Available Metadata**
+
+dataSourceName (string) - The name of the data source that has a field that is not supported for filtering.
+
+fieldName (string) - The name of the field that is not supported for filtering.
+
+<br/>
+
+#### data_source_missing_type
+
+`validation.ErrorReasonCodeDataSourceMissingType`
+
+The error code used when a data source is missing a type.
+
+**Category:** `dataSourceType`
+
+**Available Metadata**
+
+dataSourceName (string) - The name of the data source that is missing a type.
+
+<br/>
+
+#### data_source_type_not_found
+
+`provider.ErrorReasonCodeProviderDataSourceTypeNotFound`
+
+The error code used when a data source type is not found in the provider.
+
+**Category:** `dataSourceType`
+
+**Available Metadata**
+
+providerNamespace (string) - The namespace of the provider that the data source type is not found in.
+
+dataSourceType (string) - The type of the data source that is not found in the provider.
+
+<br/>
+
+#### function_not_found
+
+`provider.ErrorReasonCodeFunctionNotFound`
+
+The error code used when a function is not found in any of the installed providers.
+
+**Category:** `function`
+
+**Available Metadata**
+
+functionName (string) - The name of the function that is not found.
+
+<br/>

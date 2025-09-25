@@ -76,7 +76,7 @@ The endpoint of the deploy engine api, this is used if `--connect-protocol` is s
 
 **Type**: `string`
 
-**Default Value**: `engine.auth.json`
+**Default Value**: `$HOME/.bluelink/clients/engine.auth.json`
 
 The path to the authentication configuration file for the deploy engine.
 This is used to authenticate with the deploy engine when using the `stage-changes`, `deploy`, `destroy` and `validate` commands.
@@ -95,10 +95,37 @@ To get usage information for a specific command, run the following:
 bluelink [command] --help
 ```
 
+## `init`
+
+This command initialises a new blueprint project.
+It will take you through a series of prompts to create a new blueprint project.
+You can provide command line options to skip parts of the interactive process of setting up a new blueprint project.
+
 ## `validate`
 
 This command validates a blueprint file.
 It will validate the project blueprint and other configuration files.
+
+Run the command without any flags and go through the interactive prompts to validate a blueprint file:
+
+```bash
+bluelink validate
+```
+
+Validating a pre-selected local blueprint file:
+```bash
+bluelink validate --blueprint-file ./project.blueprint.yaml
+```
+
+Validating a pre-selected public URL:
+```bash
+bluelink validate --blueprint-file https://example.com/project.blueprint.yaml
+```
+
+Validating a pre-selected path to a file in an object storage bucket:
+```bash
+bluelink validate --blueprint-file s3://bucket-name/path/to/project.blueprint.yaml
+```
 
 ### `--blueprint-file`
 
@@ -106,7 +133,14 @@ It will validate the project blueprint and other configuration files.
 
 **Configuration Key**: `validateBlueprintFile`
 
-**Default Value**: `app.blueprint.yaml`
+**Default Value**: `project.blueprint.yaml`
+
+The blueprint file to validate.
+This can be a local file, a public URL or a path to a file in an object storage bucket.
+Local files can be specified as a relative or absolute path to the file.
+Public URLs must start with `https://` and represent a valid URL to a blueprint file.
+Object storage bucket files must be specified in the format of `{scheme}://{bucket-name}/{object-path}`,
+where `{scheme}` is one of the following: `s3`, `gcs`, `azureblob`.
 
 ### `--check-blueprint-vars`
 
@@ -142,24 +176,6 @@ When this flag is set, the provider and transformer configuration sourced from d
 
 ## `destroy`
 
-## `login`
-
-This command logs into a plugin registry to allow the installation of plugins from specific protected registries by host.
-
-An example of logging into a plugin registry:
-```bash
-bluelink login registry.customhost.com
-```
-
-The auth configuration for plugin registries is expected to be present in the `$HOME/.bluelink/auth.json` file.
-See the [Plugin Registry Authentication Protocol](/docs/plugin-framework/registry-protocols-formats/auth-protocol) for more information on how to authenticate with a plugin registry.
-
-## `init`
-
-This command initialises a new blueprint project.
-It will take you through a series of prompts to create a new blueprint project.
-You can provide command line options to skip parts of the interactive process of setting up a new blueprint project.
-
 ## `plugins`
 
 This is the command category for managing deploy engine plugins installed on the machine
@@ -171,6 +187,18 @@ These plugins will only be available when running commands such as `deploy` or `
 against an instance of the deploy engine running on the same machine.
 This is the default behaviour if a custom host is not specified for the deploy engine.
 </Callout>
+
+### `login`
+
+This command logs into a plugin registry to allow the installation of plugins from specific protected registries by host.
+
+An example of logging into a plugin registry:
+```bash
+bluelink login registry.customhost.com
+```
+
+The auth configuration for plugin registries is expected to be present in the `$HOME/.bluelink/auth.json` file.
+See the [Plugin Registry Authentication Protocol](/docs/plugin-framework/registry-protocols-formats/auth-protocol) for more information on how to authenticate with a plugin registry.
 
 ### `list`
 
@@ -215,5 +243,15 @@ As plugin IDs are globally unique, the CLI does not differentiate between provid
 for the sake of installation.
 
 ### `uninstall`
+
+## `resources`
+
+## `links`
+
+## `functions`
+
+## `datasources`
+
+## `variable-types`
 
 ## `version`
