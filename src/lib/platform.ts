@@ -17,8 +17,8 @@ export type NavigatorUAData = {
 // that will eventually replace navigator.userAgent
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-let userAgentData = window.navigator.userAgentData as NavigatorUAData
-let userAgent = window.navigator.userAgent
+let userAgentData = typeof window !== 'undefined' ? window.navigator.userAgentData as NavigatorUAData : null
+let userAgent = typeof window !== 'undefined' ? window.navigator.userAgent : null
 
 const mobiles = {
     iphone: /iphone/,
