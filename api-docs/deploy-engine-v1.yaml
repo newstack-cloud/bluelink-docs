@@ -104,6 +104,7 @@ tags:
     description: Endpoints for change staging and deployments.
   - name: Events
     description: Endpoints for managing events across validation, change staging and deployments.
+
 paths:
   /validations:
     post:
@@ -3526,6 +3527,12 @@ components:
             the variables defined in this object.
           additionalProperties:
             $ref: "#/components/schemas/ScalarValue"
+        dependencies:
+          type: object
+          description: |
+            A mapping of plugin IDs to version constraint strings representing the plugin dependencies required for a given blueprint.
+          additionalProperties:
+            type: string
       example:
         providers:
           aws:
@@ -3538,6 +3545,9 @@ components:
           myConfigKey: my-config-value
         blueprintVariables:
           region: us-east-1
+        dependencies:
+          newstack-cloud/aws: "^1.5.0"
+          newstack-cloud/celerity: "1.0.0"
 
     AnyValue:
       description: |
