@@ -3,7 +3,7 @@ title: Specification
 description: The blueprint language specification
 ---
 
-**v2025-05-12**
+**v2025-05-12-draft**
 
 This section provides the first version of the Blueprint Specification with accompanying examples.
 
@@ -55,9 +55,9 @@ string
 
 **allowed values** 
 
-2025-05-12
+2025-05-12-draft
 
-For the v2025-05-12 version of the specification, the only valid value is `2025-05-12`.
+For the v2025-05-12-draft version of the specification, the only valid value is `2025-05-12-draft`.
 
 ### transform
 
@@ -2246,6 +2246,110 @@ for example, `${cacheCluster.spec.config.host}` or `https://${cacheCluster.spec.
 
 In the case of a reference that yields a complex type, string interpolation isn't particularly useful and can lead to unexpected results.
 For this reason, implementations of the spec should explicitly report informative errors to the user when string interpolation is attempted on a reference that yields a complex type.
+
+### Binary Data Handling
+
+The Blueprint specification supports handling binary data through functions in the substitution language, enabling scenarios that require certificates, keys, code packages, and other binary content.
+
+#### Binary Data Functions
+
+The substitution language provides core functions for working with binary data. For detailed information about these functions, see the [Core Function Definitions](/docs/bluelink/blueprints/core-functions).
+
+The core functions for binary data include:
+- `file(path)` - Reads binary data from a file path (local or remote)
+- `base64encode(data)` - Encodes binary data to base64 string
+- `base64decode(string)` - Decodes base64 string to binary data
+- `sha256(data)` - Computes SHA-256 hash of input data
+- `md5(data)` - Computes MD5 hash of input data
+- `sha1(data)` - Computes SHA-1 hash of input data
+
+#### Use Cases for Binary Data
+
+**Certificates and Keys:**
+```yaml
+# Local files
+resources:
+  certificate:
+    type: aws/acm/certificate
+    spec:
+      certificateBody: ${base64encode(file("certificates/server.pem"))}
+      privateKey: ${base64encode(file("certificates/private.key"))}
+
+# Remote files
+resources:
+  certificate:
+    type: aws/acm/certificate
+    spec:
+      certificateBody: ${base64encode(file("s3://my-bucket/certificates/server.pem"))}
+      privateKey: ${base64encode(file("s3://my-bucket/certificates/private.key"))}
+```
+
+**Lambda Function Code:**
+```yaml
+# Local files
+resources:
+  function:
+    type: aws/lambda/function
+    spec:
+      code:
+        zipFile: ${base64encode(file("dist/function.zip"))}
+
+# Remote files
+resources:
+  function:
+    type: aws/lambda/function
+    spec:
+      code:
+        zipFile: ${base64encode(file("s3://my-bucket/dist/function.zip"))}
+```
+
+**Processing Binary Data:**
+```yaml
+datasources:
+  certificate:
+    type: aws/acm/certificate
+    exports:
+      certificateBody:
+        type: string
+
+# Process binary data before storing
+values:
+  certificateHash:
+    type: string
+    value: ${sha256(base64decode(datasources.certificate.certificateBody))}
+
+resources:
+  application:
+    type: aws/ec2/instance
+    spec:
+      # Use the processed certificate hash
+      certificateHash: ${values.certificateHash}
+```
+
+#### Encoding Behavior for Blueprint Element Fields
+
+When a substitution resolves to a field from a blueprint element (resource spec, data source export, etc.), the field value will always be resolved as a **UTF-8 encoded string** by default.
+
+**Examples:**
+
+```yaml
+# Resource spec fields resolve to UTF-8 strings
+${resources.database.spec.endpoint}        # UTF-8 string
+${resources.function.spec.functionName}   # UTF-8 string
+
+# Data source exports resolve to UTF-8 strings  
+${datasources.network.vpc}                # UTF-8 string
+${datasources.certificate.certificateBody} # UTF-8 string (base64-encoded content)
+
+# Child blueprint exports resolve to UTF-8 strings
+${children.coreInfra.databaseHost}        # UTF-8 string
+```
+
+**Binary Data Handling:**
+- Binary data from `file()` function is returned as raw bytes
+- Use `base64encode()` to convert binary data to base64 strings for storage/transmission
+- Use `base64decode()` to convert base64 strings back to binary data for processing
+- All blueprint element fields are UTF-8 strings, even when they contain base64-encoded binary content
 
 ### `${..}` Substitution Reference Usage
 

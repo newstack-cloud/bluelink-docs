@@ -15,6 +15,8 @@ Deploy configuration is used with the following commands:
 - `deploy` - Used to ensure that all the final blueprint variables are set and that providers and transformers are configured correctly when deploying resources for a new blueprint instance. The change staging process makes use of the final blueprint variables in producing a change set to be deployed, however, not all values can be resolved during change staging, especially where there are dependencies between resources. To account for this, the blueprint document is required along with blueprint variable overrides to resolve the remaining values during the deployment process.
 - `destroy` - Used to ensure that providers and transformers are configured correctly when destroying resources in a blueprint instance. This command does not make use of an input blueprint file so blueprint variable overrides are not used.
 - `validate` - Used to ensure that providers and transformers are configured correctly when validating a blueprint document. This command usually does not make use of blueprint variable overrides as validation is carried out on the source blueprint document and not a deployed instance. Plugins may provide custom validation logic that in advanced cases may require calls to APIs that require credentials and configuration.
+- `plugins install` - Used to install plugins from a plugin registry defined in the `dependencies` section of the deploy configuration file.
+- `plugins uninstall` - Used to remove the specified plugin from the `dependencies` section of the deploy configuration file along with uninstalling the plugin from the current system.
 
 <Callout title="Warning" type="warning">
 This is not to be confused with the configuration for the CLI, this is purely for providing blueprint variable overrides and configuration for Deploy Engine plugins.
@@ -44,6 +46,9 @@ This file is expected to contain the following structure:
   },
   "blueprintVariables": {
     "<key>": "<value> (string | number | boolean)"
+  },
+  "dependencies": {
+    "<plugin-id>": "<version-constraint> (string)"
   }
 }
 ```
@@ -53,6 +58,13 @@ This file is expected to contain the following structure:
 `<transformer-name>` is the name of the transformer that is being configured. This name is the last part of the plugin ID for the transformer. For example, for the plugin ID `newstack-cloud/awsTransform`, the transformer name would be `awsTransform`.
 
 For each provider and transformer, the keys and values are specific to the provider or transformer being configured. The valid keys and values can be found in the plugin documentation. The Deploy Engine will validate the configuration against the plugin schema when any of the `stage-changes`, `deploy`, `destroy` or `validate` commands are run unless the `--skip-config-validation` option is specified.
+
+`<plugin-id>` is the ID of the plugin to install. There should be an entry for each transformer and provider that is used in the project.
+
+`<version-constraint>` is the version constraint of the plugin to install, this can be in any of the following formats:
+- `^1.0.0` - This will install the latest minor version of the plugin that is compatible with version `1.0.0` (e.g. `1.1.0`).
+- `~1.0.0` - This will install the latest patch version of the plugin that is compatible with version `1.0.0` (e.g. `1.0.1`).
+- `1.0.0` - This will install the exact version `1.0.0` of the plugin.
 
 ### Example
 
@@ -76,15 +88,40 @@ For each provider and transformer, the keys and values are specific to the provi
   },
   "blueprintVariables": {
     "region": "us-east-1"
+  },
+  "dependencies": {
+    "newstack-cloud/aws": "~2.2.1",
+    "newstack-cloud/celerity": "~1.5.0",
+    "registry.customhost.com/my-org/gcp": "1.0.0"
   }
 }
 ```
 
+### Dependencies
+
+The `dependencies` section is used to install plugins from either the official plugin registry or custom plugin registries
+configured in the CLI.
+
+These are only used to install plugins for an instance of the deploy engine running on the same machine as the CLI.
+For deploying to a remote instance of the deploy engine, the `dependencies` list is checked for compatibility based on plugins installed
+for the remote instance.
+
+Bluelink does **_not_** support transitive dependencies between plugins, you must declare all the plugins to be used by your project in the `dependencies` section.
+
+## Multiple Environments
+
+When you want to deploy a blueprint project to multiple environments, you can create a separate deploy configuration file for each environment.
+For example, you could create a `bluelink.deploy.dev.jsonc` file for a development environment and set the `--deploy-config-file` option to
+`bluelink.deploy.dev.jsonc` when deploying to the development environment.
+
 ## Version Control
 
-The deploy configuration file is not intended to be version controlled when its contents is primarily used for credentials and blueprint variable overrides that can contain sensitive information. However, for provider or transformer specific configuration, it can be useful to commit sections of this file to version control.
+The deploy configuration file is not intended to be version controlled when its contents is primarily used for credentials and blueprint variable overrides that can contain sensitive information.
+However, for provider or transformer specific configuration and dependencies, in most cases it will be useful to commit sections of this file to version control.
 
-When you want to commit sections of configuration in the app deploy configuration file to version control, you can either commit the entire file and use environment variable substitution for sensitive information like so:
+### Environment Variable Substitution
+
+When you want to commit configuration in the deploy configuration file to version control, you can commit the entire file and use environment variable substitution for sensitive information like so:
 
 ```javascript title="bluelink.deploy.jsonc"
 {
@@ -104,9 +141,18 @@ When you want to commit sections of configuration in the app deploy configuratio
   "contextVariables": {},
   "blueprintVariables": {
     "region": "${REGION}"
+  },
+  "dependencies": {
+    "newstack-cloud/aws": "~2.2.1",
+    "newstack-cloud/celerity": "~1.5.0",
+    "registry.customhost.com/my-org/gcp": "1.0.0"
   }
 }
 ```
+
+The Bluelink CLI will substitute the environment variables before making requests to the Deploy Engine.
+
+### Template File
 
 Alternatively, you can create a template file that contains the configuration you want to commit to version control and have placeholders for sensitive information that should be populated in the final file used with the Bluelink CLI.
 You can then copy this template file to the final file used with the Bluelink CLI and populate the placeholders with environment variables or secrets loaded into a CI/CD or local environment from which you are deploying a blueprint.
@@ -127,6 +173,35 @@ You can then copy this template file to the final file used with the Bluelink CL
   "contextVariables": {},
   "blueprintVariables": {
     "region": "[placeholder__region]"
+  },
+  "dependencies": {
+    "newstack-cloud/aws": "~2.2.1",
+    "newstack-cloud/celerity": "~1.5.0",
+    "registry.customhost.com/my-org/gcp": "1.0.0"
   }
 }
+```
+
+An example python script for populating the template file with environment variables:
+
+```python title="generate_deploy_config.py"
+import re
+import os
+
+def main():
+    with open('bluelink.deploy.template.jsonc', 'r') as file:
+        contents = file.read()
+
+    env_vars = re.findall(r'\[placeholder__(.*?)\]', contents)
+
+    for env_var in env_vars:
+        value = os.getenv(env_var.upper())
+        if value:
+            contents = contents.replace(f'[placeholder__{env_var}]', value)
+
+    with open('bluelink.deploy.jsonc', 'w') as file:
+        file.write(contents)
+
+if __name__ == "__main__":
+    main()
 ```

@@ -3,7 +3,7 @@ title: Spec Core Functions
 description: The core functions that should be supported by all implementations of the blueprint specification
 ---
 
-**v2025-05-12**
+**v2025-05-12-draft**
 
 This document contains the definitions of the core `${..}` substitution utility functions that should be supported by all implementations of the spec.
 
@@ -1201,6 +1201,634 @@ True, if the first number is less than or equal to the second number, false othe
 ${le(len(datasources.network.subnets), 10)}
 ```
 
+
+## `if`
+
+A function that returns one of two values based on a boolean condition.
+
+**Parameters:**
+
+1. `boolean` - A boolean expression that determines which value to return.
+2. `any` - The value to return if the condition is true.
+3. `any` - The value to return if the condition is false.
+
+**Returns:**
+
+`any`
+
+The value corresponding to the boolean condition result.
+
+**Examples:**
+
+Simple conditional:
+```
+${if(eq(variables.environment, "production"), "us-east-1", "us-west-2")}
+```
+
+Nested conditionals:
+```
+${if(
+  eq(variables.environment, "production"), 
+  "large",
+  if(eq(variables.environment, "staging"), "medium", "small")
+)}
+```
+
+Complex object selection:
+```
+${if(
+  eq(variables.environment, "production"),
+  object(size="large", replicas=3, region="us-east-1"),
+  object(size="small", replicas=1, region="us-west-2")
+)}
+```
+
+**Compositional Approach for Complex Conditionals:**
+
+For complex conditionals that would be difficult to read in a single expression, especially in JSON format, break them into smaller, composable pieces:
+
+```yaml
+values:
+  # Break down complex conditions into named boolean values
+  isProduction:
+    type: boolean
+    value: ${and(eq(variables.environment, "production"), eq(variables.region, "us-east-1"))}
+  
+  isStaging:
+    type: boolean
+    value: ${eq(variables.environment, "staging")}
+  
+  # Define configuration objects separately
+  productionConfig:
+    type: object
+    value: ${object(
+      size="large",
+      replicas=3,
+      region="us-east-1",
+      backupEnabled=true,
+      monitoringLevel="detailed"
+    )}
+  
+  stagingConfig:
+    type: object
+    value: ${object(
+      size="medium",
+      replicas=2,
+      region="us-west-2",
+      backupEnabled=true,
+      monitoringLevel="standard"
+    )}
+  
+  developmentConfig:
+    type: object
+    value: ${object(
+      size="small",
+      replicas=1,
+      region="us-west-1",
+      backupEnabled=false,
+      monitoringLevel="basic"
+    )}
+  
+  # Compose the final conditional using the helper values
+  deploymentConfig:
+    type: object
+    value: ${if(
+      values.isProduction,
+      values.productionConfig,
+      if(values.isStaging, values.stagingConfig, values.developmentConfig)
+    )}
+```
+
+## `first`
+
+A function that returns the first non-empty value from a list of arguments.
+Empty values include empty strings (`""`) and empty arrays (`[]`).
+
+**Parameters:**
+
+N arguments of any type that will be evaluated in order to find the first non-empty value.
+
+**Returns:**
+
+`any`
+
+The first non-empty value from the provided arguments. If all arguments are empty, the function will return the last argument (which will be empty).
+
+**Examples:**
+
+Basic usage with fallback values:
+```
+${first(variables.customHost, variables.defaultHost, "localhost")}
+```
+
+With data source fallbacks:
+```
+${first(
+  datasources.primaryVpc.vpcId,
+  datasources.fallbackVpc.vpcId,
+  "vpc-default"
+)}
+```
+
+Environment-specific defaults:
+```
+${first(
+  variables.databaseHost,
+  if(eq(variables.environment, "production"), "prod-db.example.com", "dev-db.example.com")
+)}
+```
+
+Configuration with sensible defaults:
+```
+${first(variables.logLevel, "info")}
+```
+
+## `lookup`
+
+A function that retrieves a value from a map/object using a key, with a required default value if the key is not found.
+You should use this function instead of `.` or `[]` accessors if you need to provide a default value if the key is not found.
+
+**Parameters:**
+
+1. `mapping` - A map/object to look up the value from.
+2. `string` - The key to look up in the map/object.
+3. `any` - The default value to return if the key is not found.
+
+**Returns:**
+
+`any`
+
+The value associated with the key in the map/object, or the default value if the key is not found.
+
+**Examples:**
+
+Basic lookup with default:
+```
+${lookup(values.environmentConfig, variables.environment, values.defaultConfig)}
+```
+
+Environment-specific resource sizing:
+```
+${lookup(
+  object(
+    "production" = "large",
+    "staging" = "medium", 
+    "development" = "small"
+  ),
+  variables.environment,
+  "small"
+)}
+```
+
+## `base64encode`
+
+A function that encodes binary data to Base64 format using the standard [RFC 4648](https://datatracker.ietf.org/doc/rfc4648/) encoding (including padding).
+
+**Parameters:**
+
+1. `binary` - The binary data to encode to Base64.
+
+**Returns:**
+
+`string`
+
+The Base64-encoded string using standard RFC 4648 encoding with padding.
+
+**Examples:**
+
+Encoding binary data from files:
+```
+${base64encode(file("certificates/server.pem"))}
+```
+
+Encoding binary data from network requests:
+```
+${base64encode(http_resource("https://example.com/app.zip"))}
+```
+
+Encoding string data (string is converted to UTF-8 bytes, then base64 encoded):
+```
+${base64encode("#!/bin/bash\necho 'Hello World'")}
+```
+
+## `base64decode`
+
+A function that decodes a Base64-encoded string back to binary data using the standard [RFC 4648](https://datatracker.ietf.org/doc/rfc4648/) encoding (including padding).
+
+**Parameters:**
+
+1. `string` - The Base64-encoded string to decode.
+
+**Returns:**
+
+`binary`
+
+The decoded binary data from the Base64 input using standard RFC 4648 encoding with padding.
+
+**Examples:**
+
+Decoding Base64-encoded data:
+```
+${base64decode("SGVsbG8gV29ybGQ=")}
+```
+
+Decoding and parsing JSON:
+```
+${jsondecode(utf8(base64decode(variables.encodedConfig)))}
+```
+
+**Blueprint Element Field Usage:**
+
+When the output of `base64decode()` is used as the value of a blueprint element field (resource spec, data source export, etc.), it will be automatically UTF-8 encoded by default. This means the binary data will be converted to a UTF-8 string representation.
+
+## `min`
+
+A function that returns the minimum value from a list of numbers.
+
+**Parameters:**
+
+N arguments of type `integer` or `float` to find the minimum value from.
+
+**Returns:**
+
+`integer` | `float`
+
+The minimum value from the provided arguments.
+
+**Examples:**
+
+Finding minimum from multiple values:
+```
+${min(10, 5, 8, 3)}  # Returns 3
+```
+
+Dynamic resource sizing:
+```
+${min(variables.maxInstances, 10)}
+```
+
+## `max`
+
+A function that returns the maximum value from a list of numbers.
+
+**Parameters:**
+
+N arguments of type `integer` or `float` to find the maximum value from.
+
+**Returns:**
+
+`integer` | `float`
+
+The maximum value from the provided arguments.
+
+**Examples:**
+
+Finding maximum from multiple values:
+```
+${max(10, 5, 8, 3)}  # Returns 10
+```
+
+Ensuring minimum resource allocation:
+```
+${max(variables.minInstances, 2)}
+```
+
+## `abs`
+
+A function that returns the absolute value of a number.
+
+**Parameters:**
+
+1. `integer` | `float` - The number to get the absolute value of.
+
+**Returns:**
+
+`integer` | `float`
+
+The absolute value of the input number.
+
+**Examples:**
+
+Getting absolute value:
+```
+${abs(-5)}  # Returns 5
+${abs(3)}   # Returns 3
+```
+
+## `cidrsubnet`
+
+A function that calculates subnet addresses within a given CIDR block.
+
+**Parameters:**
+
+1. `string` - The CIDR block to calculate subnets within (e.g., "192.168.0.0/16").
+2. `integer` - The number of additional bits to add to the prefix length.
+3. `integer` - The subnet number to calculate (0-based index).
+
+**Returns:**
+
+`string`
+
+The calculated subnet CIDR block.
+
+**Examples:**
+
+Calculating subnets:
+```
+${cidrsubnet("192.168.0.0/16", 8, 1)}  # Returns "192.168.1.0/24"
+${cidrsubnet("10.0.0.0/8", 4, 2)}      # Returns "10.2.0.0/12"
+```
+
+Dynamic subnet allocation:
+```
+${cidrsubnet(variables.vpcCidr, 4, variables.subnetIndex)}
+```
+
+## `file`
+
+A function that reads binary data from a file path (local or remote) and returns it as raw bytes.
+
+**Parameters:**
+
+1. `string` - The path to the file to read (local path or URI).
+
+**Returns:**
+
+`binary`
+
+The raw binary data from the file.
+
+**Examples:**
+
+Reading local files:
+```
+${file("certificates/server.pem")}
+${file("dist/function.zip")}
+${file("images/app.tar")}
+```
+
+Reading remote files:
+```
+${file("s3://my-bucket/certificates/server.pem")}
+${file("gs://my-bucket/dist/function.zip")}
+```
+
+**Remote File Sources:**
+
+The `file()` function supports remote file sources using URI schemes for object storage services.
+The specific schemes and their implementations are handled at the implementation level, which provides the remote source infrastructure.
+
+**Local Files:**
+- `file("path/to/local/file")` - Local file system access (mandatory for all implementations)
+
+**Remote Object Storage:**
+- `file("scheme://path/to/file")` - Remote object storage access (implementation-dependent)
+
+Where `scheme` is a placeholder for the specific URI scheme supported by an implementation of the specification.
+The actual schemes supported (such as `s3://`, `gs://`, `azure://`, etc.) and their configuration are determined by the spec implementation.
+Consult the documentation for a specific spec implementation to see the supported remote file sources and their configuration requirements.
+
+The following is an example of a remote file source:
+
+```
+${file("s3://my-bucket/certificates/server.pem")}
+```
+
+**Note:** For HTTP/HTTPS network requests, use the `http_resource()` function instead.
+
+**Blueprint Element Field Usage:**
+
+When the output of `file()` is used as the value of a blueprint element field (resource spec, data source export, etc.), it will be automatically UTF-8 encoded by default.
+
+**Examples:**
+
+```yaml
+resources:
+  certificate:
+    type: aws/acm/certificate
+    spec:
+      # This will be UTF-8 encoded automatically
+      certificateBody: ${file("certificates/server.pem")}
+```
+
+**Explicit Base64 Encoding:**
+
+If you need to explicitly base64-encode the binary data (for example, when the provider expects base64-encoded content), use `base64encode()`:
+
+```yaml
+resources:
+  certificate:
+    type: aws/acm/certificate
+    spec:
+      # Explicitly base64-encode for providers that expect it
+      certificateBody: ${base64encode(file("certificates/server.pem"))}
+```
+
+## `http_resource`
+
+A function that fetches data from public HTTP/HTTPS URLs and returns it as raw bytes.
+
+**Parameters:**
+
+1. `string` - The public HTTP/HTTPS URL to fetch data from.
+
+**Returns:**
+
+`binary`
+
+The raw binary data from the HTTP response.
+
+**Examples:**
+
+Fetching public configuration data:
+```
+${http_resource("https://raw.githubusercontent.com/example/config/main/app.json")}
+```
+
+Fetching public release files:
+```
+${http_resource("https://github.com/example/app/releases/download/v1.0.0/app.zip")}
+```
+
+Fetching public documentation:
+```
+${http_resource("https://example.com/docs/api-schema.json")}
+```
+
+**Blueprint Element Field Usage:**
+
+When the output of `http_resource()` is used as the value of a blueprint element field (resource spec, data source export, etc.), it will be automatically UTF-8 encoded by default.
+
+**Explicit Base64 Encoding:**
+
+If you need to explicitly base64-encode the binary data (for example, when the provider expects base64-encoded content), use `base64encode()`:
+
+```yaml
+resources:
+  application:
+    type: aws/ec2/instance
+    spec:
+      # Explicitly base64-encode for providers that expect it
+      userData: ${base64encode(http_resource("https://raw.githubusercontent.com/example/scripts/main/init.sh"))}
+```
+
+## `utf8`
+
+A function that converts binary data to UTF-8 encoded text.
+
+**Parameters:**
+
+1. `binary` - The binary data to convert to UTF-8 text.
+
+**Returns:**
+
+`string`
+
+The UTF-8 encoded text representation of the binary data.
+
+**When to Use:**
+
+The `utf8()` function is only needed when the result is passed into another function call for processing before the final output is set to a blueprint element field. It is **not needed** if you are setting the result directly on a blueprint element field.
+
+**Examples:**
+
+**When `utf8()` is needed (function chaining):**
+```yaml
+# JSON parsing - need utf8() because jsondecode() expects text
+${jsondecode(utf8(file("config.json")))}
+
+# String operations - need utf8() because replace() expects text
+${replace(utf8(http_resource("https://example.com/template.txt")), "{{name}}", variables.appName)}
+
+# Hash computation - need utf8() because sha256() expects text input
+${sha256(utf8(file("data.txt")))}
+```
+
+**When `utf8()` is NOT needed (direct assignment):**
+```yaml
+# Direct assignment to blueprint element field - automatic UTF-8 encoding
+resources:
+  application:
+    type: aws/ec2/instance
+    spec:
+      # No utf8() needed - automatic UTF-8 encoding
+      userData: ${file("scripts/init.sh")}
+      config: ${http_resource("https://example.com/config.json")}
+```
+
+**Summary:**
+- **Use `utf8()`** when passing binary data to other functions
+- **Don't use `utf8()`** when setting binary data directly on blueprint element fields
+- **Blueprint element fields** automatically UTF-8 encode binary data
+
+## `sha256`
+
+A function that computes the SHA-256 hash of the input data and returns it as a hexadecimal string.
+
+**Parameters:**
+
+1. `any` - The data to compute the hash for.
+
+**Returns:**
+
+`string`
+
+The SHA-256 hash as a hexadecimal string.
+
+**Examples:**
+
+Computing hash of a string:
+```
+${sha256("Hello World")}
+```
+
+Computing hash of binary data:
+```
+${sha256(base64decode(datasources.certificate.certificateBody))}
+```
+
+Using hash for resource naming:
+```
+my-bucket-${sha256(variables.environment)}
+```
+
+## `md5`
+
+A function that computes the MD5 hash of the input data and returns it as a hexadecimal string.
+
+**Parameters:**
+
+1. `any` - The data to compute the hash for.
+
+**Returns:**
+
+`string`
+
+The MD5 hash as a hexadecimal string.
+
+**Examples:**
+
+Computing MD5 hash:
+```
+${md5("Hello World")}
+```
+
+Using MD5 for file integrity:
+```
+${md5(file("config.json"))}
+```
+
+## `sha1`
+
+A function that computes the SHA-1 hash of the input data and returns it as a hexadecimal string.
+
+**Parameters:**
+
+1. `any` - The data to compute the hash for.
+
+**Returns:**
+
+`string`
+
+The SHA-1 hash as a hexadecimal string.
+
+**Examples:**
+
+Computing SHA-1 hash:
+```
+${sha1("Hello World")}
+```
+
+Using SHA-1 for data integrity:
+```
+${sha1(values.configData)}
+```
+
+## `uuid`
+
+A function that generates a version 4 UUID (random UUID) and returns it as a string.
+
+**Parameters:**
+
+None.
+
+**Returns:**
+
+`string`
+
+A version 4 UUID string.
+
+**Examples:**
+
+Generating a UUID:
+```
+${uuid()}
+```
+
+Using UUID for unique resource names:
+```
+resource-${uuid()}
+```
 
 ## `cwd`
 

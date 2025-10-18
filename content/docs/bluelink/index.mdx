@@ -11,23 +11,55 @@ Get started by **creating a new Bluelink blueprint project**.
 
 ## Install Bluelink
 
-To install Bluelink on macOS, Linux or another Unix-like OS, run the following command in your terminal:
+<InstallBluelink matchPlatform="mac">
+To install Bluelink on macOS, run the following command:
+
+```bash
+curl --proto "-https" --tlsv1.2 -sSf https://manager-sh.bluelink.dev | sh
+```
+</InstallBluelink>
+<InstallBluelink matchPlatform="linux">
+To install Bluelink on Linux, run the following command:
+
+```bash
+curl --proto "-https" --tlsv1.2 -sSf https://manager-sh.bluelink.dev | sh
+```
+</InstallBluelink>
+<InstallBluelink matchPlatform="windows">
+To install Bluelink on Windows, download one the following installers:
+
+<DownloadBluelinkInstallerWindows />
+
+These installers will install the Bluelink CLI, Deploy Engine and the Blueprint Language Server on your system.
+You will need to use the Bluelink CLI to install Deploy Engine plugins.
+
+Or run the following command in Windows Subsystem for Linux (WSL):
 
 ```bash
 curl --proto "-https" --tlsv1.2 -sSf https://manager-sh.bluelink.dev | sh
 ```
 
-Using a different system or want to install another way? Check out other ways to install Bluelink for your platform [here](/docs/bluelink/installing-bluelink).
+</InstallBluelink>
+<InstallBluelink fallback>
+To install Bluelink on macOS, Linux or another Unix-like OS, run the following command in your terminal:
+
+```bash
+curl --proto "-https" --tlsv1.2 -sSf https://manager-sh.bluelink.dev | sh
+```
+</InstallBluelink>
 
 This will run a shell script to install the [`bluelink-manager`](https://github.com/newstack-cloud/bluelink/tree/main/tools/manager) tool that will then install the [Bluelink CLI](/docs/cli/getting-started), [Deploy Engine](/docs/deploy-engine), a set of core Deploy Engine plugins and the [Blueprint Language Server](https://github.com/newstack-cloud/bluelink/tree/main/tools/blueprint-ls) on your system.
 As Bluelink consists of multiple software components, the `bluelink-manager` tool makes it easier to install them and manage updates.
+
+
+Using a different system or want to install another way? Check out other ways to install Bluelink for your platform [here](/docs/bluelink/installing-bluelink).
 
 ## Generate a new blueprint project
 
 Generate a new Bluelink blueprint project using the **AWS simple API template**:
 
-```shell
-bluelink blueprint init --template aws-simple-api my-project
+```bash
+bluelink init --template aws-simple-api --project-name my-project
 ```
 
 This will generate a new project that will contain sample source code, build tools and most importantly, a blueprint file that describes the infrastructure to be deployed to AWS.
@@ -36,21 +68,7 @@ The `project.blueprint.yml` file will contain an AWS API Gateway, some Lambda fu
 
 For blueprint projects that represent applications, the programming languages and frameworks used in the projects will vary. Most blueprint project templates will use Python or TypeScript.
 
-### Generate a blueprint without a project
-
-If you only want to initialise a template for a blueprint and not a full project, you can use the `--no-project` flag to skip the project initialisation step.
-
-For example, to create a blueprint project for an existing application, you can run:
-
-```shell
-bluelink blueprint init --template aws-simple-api --no-project .
-```
-
-This will generate a `project.blueprint.yml` file in the current directory, but will not create a new project.
-
 ## Configure deployment to AWS
-
-
 
 ## Dive Deeper
 

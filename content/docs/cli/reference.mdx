@@ -37,7 +37,11 @@ This file is expected to be in the JSON with Commas and Comments format describe
 
 If the file is not found, the CLI will send empty configuration to the Deploy Engine, which will in most cases result in an error in the response from the Deploy Engine.
 
-This file is used by the `stage-changes`, `deploy`, `destroy` and `validate` commands.
+This file is used by the `stage-changes`, `deploy`, `destroy`, `plugins (install|uninstall)` and `validate` commands.
+
+When the Deploy Engine is running on the same machine as the CLI,
+the commands that use this file will automatically install any
+missing plugins defined in the `dependencies` section.
 
 ### `--connect-protocol`
 
@@ -83,23 +87,100 @@ This is used to authenticate with the deploy engine when using the `stage-change
 
 See the [Auth Configuration](/docs/cli/auth-configuration) documentation for more information on what is expected to be present in this file.
 
-## `help`
-
-For information on all the available commands and global options, run the following:
-```bash
-bluelink help
-```
-
-To get usage information for a specific command, run the following:
-```bash
-bluelink [command] --help
-```
-
 ## `init`
 
+`bluelink init [options] [directory]`
+
 This command initialises a new blueprint project.
-It will take you through a series of prompts to create a new blueprint project.
-You can provide command line options to skip parts of the interactive process of setting up a new blueprint project.
+
+Run the command without any flags and go through the interactive prompts to create a new blueprint project:
+
+```bash
+bluelink init
+```
+
+Initialising a new blueprint project with a pre-selected template:
+
+```bash
+bluelink init --template aws-simple-api
+```
+
+Initialising a new blueprint project in a specific directory:
+
+```bash
+bluelink init --project-name my-project ./my-project
+```
+
+### `--template`
+
+**Environment Variable**: `BLUELINK_CLI_INIT_TEMPLATE`
+
+**Configuration Key**: `initTemplate`
+
+**Default Value**: `scaffold`
+
+The template to use for the new blueprint project.
+The default template is a scaffold project that generates all the files needed for a project,
+populating the blueprint file with placeholder values.
+
+### `--project-name`
+
+**Environment Variable**: `BLUELINK_CLI_INIT_PROJECT_NAME`
+
+**Configuration Key**: `initProjectName`
+
+**Type**: `string`
+
+The name of the new blueprint project.
+
+### `--blueprint-format`
+
+**Environment Variable**: `BLUELINK_CLI_INIT_BLUEPRINT_FORMAT`
+
+**Configuration Key**: `initBlueprintFormat`
+
+**Type**: `string`
+
+**Default Value**: `yaml`
+
+The format of the blueprint file to use.
+This can be either `yaml` or `jsonc`.
+
+### `--no-git`
+
+**Environment Variable**: `BLUELINK_CLI_INIT_NO_GIT`
+
+**Configuration Key**: `initNoGit`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+If true, the project will not be initialised as a git repository.
+
+### `[directory]`
+
+**Type**: `string`
+
+The directory to initialise the new blueprint project in.
+If not provided, the project will be initialised in the current working directory.
+
+## `templates`
+
+This is the command category for blueprint project templates.
+This is useful for listing available templates maintained by the Bluelink team.
+
+### `list`
+
+This command lists all the available templates maintained by the Bluelink team.
+
+Run the command without any flags to list all the available templates:
+
+```bash
+bluelink templates list
+```
+
+This is mostly useful in interactive mode where you can navigate and filter the templates available.
 
 ## `validate`
 
@@ -155,6 +236,11 @@ where `{scheme}` is one of the following: `s3`, `gcs`, `azureblob`.
 This flag enables validation of the blueprint variable values that are set in the deploy configuration file.
 By default, the CLI will not validate the blueprint variable overrides set in the deploy configuration file when validating a blueprint file.
 
+<Callout title="Interactive mode" type="warning">
+This can only be set as a command line flag, environment variable or configuration file key.
+It is not an option in the interactive prompts for the validate command.
+</Callout>
+
 ### `--check-plugin-config`
 
 **Environment Variable**: `BLUELINK_CLI_VALIDATE_CHECK_PLUGIN_CONFIG`
@@ -170,11 +256,233 @@ You can use the `--check-blueprint-vars` flag to validate the blueprint variable
 By default, configuration specific to providers and transformers is not validated as a part of this command.
 When this flag is set, the provider and transformer configuration sourced from deploy config files will be validated against the plugin configuration schemas.
 
-## `stage-changes`
+<Callout title="Interactive mode" type="warning">
+This can only be set as a command line flag, environment variable or configuration file key.
+It is not an option in the interactive prompts for the validate command.
+</Callout>
+
+## `stage`
+
+This command is used to stage changes for a blueprint instance.
+It should be used to generate change sets for updating existing blueprint instances or creating new blueprint instances.
+This will stream events from the change staging process as they occur.
+
+The change set ID will be rendered in the output of the command once the change staging process has completed,
+this can the be used with the `deploy` command to deploy the change set.
+
+Run the command without any flags and go through the interactive prompts to stage changes for a blueprint instance:
+
+```bash
+bluelink stage
+```
+
+Staging changes for a pre-selected local blueprint file for a new blueprint deployment:
+
+```bash
+bluelink stage --blueprint-file ./project.blueprint.yaml
+```
+
+Staging changes for a pre-selected local blueprint file for an existing blueprint instance:
+
+```bash
+bluelink stage --instance-name orders-stack --blueprint-file ./project.blueprint.yaml
+```
+
+### `--instance-name`
+
+**Environment Variable**: `BLUELINK_CLI_STAGE_CHANGES_INSTANCE_NAME`
+
+**Configuration Key**: `stageChangesInstanceName`
+
+**Type**: `string`
+
+The unique name of an existing blueprint instance to stage changes for.
+The instance name should not be confused with the instance ID, which is a random identifier assigned
+to the instance by the deploy engine, the instance name is one you define when creating the instance.
+This should be left empty if the `--instance-id` flag is provided.
+
+### `--instance-id`
+
+**Environment Variable**: `BLUELINK_CLI_STAGE_CHANGES_INSTANCE_ID`
+
+**Configuration Key**: `stageChangesInstanceId`
+
+**Type**: `string`
+
+The random identifier assigned to an existing blueprint instance by the deploy engine.
+This should be left empty if the `--instance-name` flag is provided.
+
+### `--blueprint-file`
+
+**Environment Variable**: `BLUELINK_CLI_STAGE_CHANGES_BLUEPRINT_FILE`
+
+**Configuration Key**: `stageChangesBlueprintFile`
+
+**Default Value**: `project.blueprint.yaml`
+
+The blueprint file to use in the change staging process.
+This can be a local file, a public URL or a path to a file in an object storage bucket.
+Local files can be specified as a relative or absolute path to the file.
+Public URLs must start with `https://` and represent a valid URL to a blueprint file.
+Object storage bucket files must be specified in the format of `{scheme}://{bucket-name}/{object-path}`,
+where `{scheme}` is one of the following: `s3`, `gcs`, `azureblob`.
+
+### `--destroy`
+
+**Environment Variable**: `BLUELINK_CLI_STAGE_CHANGES_DESTROY`
+
+**Configuration Key**: `stageChangesDestroy`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+If true, the change set will be created for a destroy operation.
+This will only be used if the `--instance-id` or `--instance-name` flags are provided.
 
 ## `deploy`
 
+This command is used to deploy a change set for a given blueprint instance.
+It should be used to deploy updates to existing blueprint instances and new blueprint instances.
+This will stream events from the deployment process as they occur.
+
+Run the command without any flags and go through the interactive prompts to deploy a change set for a blueprint instance:
+
+```bash
+bluelink deploy
+```
+
+Deploying a change set for a pre-selected instance using the latest change set in the deploy engine for that instance:
+
+```bash
+bluelink deploy --instance-name order-stack
+```
+
+Deploying a pre-selected instance and change set for a blueprint deployment:
+
+```bash
+bluelink deploy --instance-name order-stack --change-set-id a471bbb8-1267-4e65-873b-fa86bca71fcf
+```
+
+### `--change-set-id`
+
+**Environment Variable**: `BLUELINK_CLI_DEPLOY_CHANGE_SET_ID`
+
+**Configuration Key**: `deployChangeSetId`
+
+**Type**: `string`
+
+The ID of the change set to deploy.
+This is the result of running the `stage` command for a new or existing blueprint instance.
+The change set ID is optional and the latest change set for a given instance name or ID will be used if not provided.
+
+### `--instance-name`
+
+**Environment Variable**: `BLUELINK_CLI_DEPLOY_INSTANCE_NAME`
+
+**Configuration Key**: `deployInstanceName`
+
+**Type**: `string`
+
+The user-defined unique name of the blueprint instance to deploy the change set for.
+This should be left empty if the `--instance-id` flag is provided.
+
+### `--instance-id`
+
+**Environment Variable**: `BLUELINK_CLI_DEPLOY_INSTANCE_ID`
+
+**Configuration Key**: `deployInstanceId`
+
+**Type**: `string`
+
+The generated ID of the blueprint instance to deploy the change set for.
+This should be left empty if the `--instance-name` flag is provided.
+
+### `--rollback`
+
+**Environment Variable**: `BLUELINK_CLI_DEPLOY_ROLLBACK`
+
+**Configuration Key**: `deployRollback`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+If true, the deployment will be treated as a rollback operation for a previously deployed or destroyed blueprint instance.
+This can be used to indicate that the deployment is a "restoration" of a previously destroyed instance
+or a rollback to a previous state of a blueprint instance.
+
 ## `destroy`
+
+This command is used to destroy a blueprint instance.
+This will stream events from the destroy process as they occur.
+
+Run the command without any flags and go through the interactive prompts to destroy a blueprint instance:
+
+```bash
+bluelink destroy
+```
+
+Destroying a pre-selected instance using the latest change set in the deploy engine for that instance:
+
+```bash
+bluelink destroy --instance-name order-stack
+```
+
+Destroying a pre-selected instance and change set for a blueprint deployment:
+
+```bash
+bluelink destroy --instance-name order-stack --change-set-id a471bbb8-1267-4e65-873b-fa86bca71fcf
+```
+
+### `--change-set-id`
+
+**Environment Variable**: `BLUELINK_CLI_DESTROY_CHANGE_SET_ID`
+
+**Configuration Key**: `destroyChangeSetId`
+
+**Type**: `string`
+
+The ID of the change set to use to destroy the blueprint instance.
+This is the result of running the `stage` command with the `--destroy` flag for an existing blueprint instance.
+The change set ID is optional and the latest change set for a given instance name or ID will be used if not provided.
+
+### `--instance-name`
+
+**Environment Variable**: `BLUELINK_CLI_DESTROY_INSTANCE_NAME`
+
+**Configuration Key**: `destroyInstanceName`
+
+**Type**: `string`
+
+The user-defined unique name of the blueprint instance to destroy.
+This should be left empty if the `--instance-id` flag is provided.
+
+### `--instance-id`
+
+**Environment Variable**: `BLUELINK_CLI_DESTROY_INSTANCE_ID`
+
+**Configuration Key**: `destroyInstanceId`
+
+**Type**: `string`
+
+The generated ID of the blueprint instance to destroy.
+This should be left empty if the `--instance-name` flag is provided.
+
+### `--rollback`
+
+**Environment Variable**: `BLUELINK_CLI_DESTROY_ROLLBACK`
+
+**Configuration Key**: `destroyRollback`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+If true, the destroy action will be treated as a rollback operation for a previously deployed blueprint instance.
+This can be used to indicate a rollback to a previous state where the current blueprint instance
+was deployed successfully but another part of the deployment failed, this typically happens when the current blueprint instance
+is a child of another blueprint instance that failed to deploy.
 
 ## `plugins`
 
@@ -218,40 +526,76 @@ The type of plugins to list.
 
 ### `install`
 
+`bluelink plugins install [plugin-1] [plugin-2] ...`
+
 Installs one or more plugins on the machine that the CLI is running on.
 This command takes one or more plugin IDs as arguments.
 
+An example of installing plugins defined in the deploy configuration file:
+```bash
+bluelink plugins install
+```
+
 An example of installing a single plugin:
 ```bash
-bluelink plugins install bluelink/aws
+bluelink plugins install newstack-cloud/aws
 ```
 
 An example of installing multiple plugins:
 ```bash
-bluelink plugins install bluelink/aws bluelink/azure registry.customhost.com/bluelink/gcp
+bluelink plugins install newstack-cloud/aws newstack-cloud/azure registry.customhost.com/my-org/gcp
 ```
 
 Plugins that exist in the bluelink registry do not need the full URL with the host name,
 only plugins stored in a custom registry need the full URL.
 For example, the plugin ID `bluelink/aws` will be resolved to `registry.bluelink.dev/bluelink/aws`.
 
-The Bluelink CLI only supports sourcing plugins from a custom registry if it has been added to the
-allowed registries, you can create a PR or contact the Bluelink team to get a custom registry
-verified and added to the list of allowed registries.
-
 As plugin IDs are globally unique, the CLI does not differentiate between provider and transformer plugins
 for the sake of installation.
 
 ### `uninstall`
 
-## `resources`
+`bluelink plugins uninstall [plugin-1] [plugin-2] ...`
 
-## `links`
+Uninstalls one or more plugins from the machine that the CLI is running on.
+This command takes one or more plugin IDs as arguments.
 
-## `functions`
+An example of uninstalling a single plugin:
+```bash
+bluelink plugins uninstall newstack-cloud/aws
+```
 
-## `datasources`
 
-## `variable-types`
+An example of uninstalling multiple plugins:
+```bash
+bluelink plugins uninstall newstack-cloud/aws newstack-cloud/azure registry.customhost.com/my-org/gcp
+```
+
+Like with the `install` command, plugins that exist in the bluelink registry do not need the full URL with the host name,
+only plugins stored in a custom registry need the full URL.
+For example, the plugin ID `bluelink/aws` will be resolved to `registry.bluelink.dev/bluelink/aws`.
+
+As plugin IDs are globally unique, the CLI does not differentiate between provider and transformer plugins
+when removing them.
+
+## `help`
+
+For information on all the available commands and global options, run the following:
+```bash
+bluelink help
+```
+
+To get usage information for a specific command, run the following:
+```bash
+bluelink [command] --help
+```
 
 ## `version`
+
+This command prints the version of the CLI along with the build OS, architecture and date of the build.
+
+Run the command to print the version of the CLI:
+
+```bash
+bluelink version
+```
