@@ -2827,7 +2827,7 @@ resources:
       monitoring: ${if(eq(variables.env, "prod"), true, none)}
 ```
 
-When `variables.env` is `"dev"`, the materialized output omits the `monitoring` field entirely:
+When `variables.env` is `"dev"`, the materialised output omits the `monitoring` field entirely:
 
 ```yaml
 resources:

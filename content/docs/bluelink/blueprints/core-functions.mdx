@@ -1446,7 +1446,7 @@ resources:
       monitoring: ${if(eq(variables.env, "prod"), true, none)}
 ```
 
-When `variables.env` is not `"prod"`, the `monitoring` field is completely omitted from the materialized blueprint.
+When `variables.env` is not `"prod"`, the `monitoring` field is completely omitted from the materialised blueprint.
 
 *Chaining with `coalesce()` for complex defaults:*
 ```yaml
@@ -2192,7 +2192,7 @@ ${none}
 **Behavior:**
 
 When a substitution expression evaluates to `none`:
-- The field containing that substitution is **omitted** from the materialized blueprint
+- The field containing that substitution is **omitted** from the materialised blueprint
 - In string interpolation, `none` is treated as an empty string (`""`)
 - Most functions **propagate** `none` (if any argument is `none`, the result is `none`)
 - Some functions **handle** `none` specially (e.g., `or`, `if`, `first`)
