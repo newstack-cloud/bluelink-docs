@@ -3,7 +3,7 @@ title: Spec Core Functions
 description: The core functions that should be supported by all implementations of the blueprint specification
 ---
 
-**v2025-05-12-draft**
+**v2025-11-02**
 
 This document contains the definitions of the core `${..}` substitution utility functions that should be supported by all implementations of the spec.
 
@@ -220,6 +220,8 @@ The input string with all leading and trailing whitespace removed.
 ${trim(values.cacheClusterConfig.host)}
 ```
 
+**Handling `none` Values:** If the input is `none`, returns `none` (propagates). This applies to all string manipulation functions.
+
 
 ## `trimprefix`
 
@@ -363,6 +365,31 @@ A single string that is the result of joining the array of strings with the deli
 
 ```
 ${join(values.cacheClusterConfig.hosts, ",")}
+```
+
+**Type Coercion:**
+
+Non-string array elements are automatically converted to strings before joining:
+
+```yaml
+# Integers are converted to strings
+ports: ${join([8080, 8081, 8082], ",")}
+# Result: "8080,8081,8082"
+
+# Booleans are converted to strings
+flags: ${join([true, false, true], "|")}
+# Result: "true|false|true"
+```
+
+**Handling `none` Values:**
+
+- If the array itself is `none`, the result is `none`
+- Array elements that are `none` are filtered out before joining
+
+```yaml
+# Elements with none are skipped
+tags: ${join(["tag1", none, "tag2", none, "tag3"], ",")}
+# Result: "tag1,tag2,tag3"
 ```
 
 
@@ -715,6 +742,16 @@ ${map(
 )}
 ```
 
+**Handling `none` Values:**
+
+- If the input array is `none`, the result is `none`
+- If the mapping function returns `none` for an element, that element is filtered out from the result
+
+```yaml
+# Elements that map to none are removed from output
+result: ${map(items, if_g(shouldInclude, transform, none))}
+```
+
 
 ## `filter`
 
@@ -736,7 +773,7 @@ An array of filtered values based on the predicate function.
 ```
 ${filter(
   datasources.network.subnets,
-  hasprefix_g("subnet-402948-")
+  has_prefix_g("subnet-402948-")
 )}
 ```
 
@@ -760,15 +797,46 @@ to be able to apply more complex transformations of data in blueprints.
 
 The accumulated value as a result of applying the reducer function to each item in the array.
 
-**Example:**
+**Examples:**
 
+Summing array values (requires implementation-provided or custom reducer function):
+```yaml
+# Sum up all memory allocations across instances
+totalMemory: |
+  ${reduce(
+    datasources.instances.items,
+    sum_memory_reducer,
+    0
+  )}
 ```
-${reduce(
-  datasources.network.subnets,
-  extract_crucial_network_info,
-  object()
-)}
+
+Building a map from an array (requires implementation-provided or custom reducer function):
+```yaml
+# Create a map of instance IDs to instance names
+instanceMap: |
+  ${reduce(
+    datasources.instances.items,
+    build_id_to_name_map,
+    object()
+  )}
 ```
+
+Aggregating configuration from multiple sources:
+```yaml
+# Combine all tags from multiple resources into a single tag set
+allTags: |
+  ${reduce(
+    list(
+      datasources.vpc.tags,
+      datasources.subnet.tags,
+      variables.customTags
+    ),
+    merge_tags_reducer,
+    object()
+  )}
+```
+
+**Note:** The `reduce` function requires custom or implementation-provided reducer functions that match the signature `func<Item, Accum>(Accum, Item, integer?) -> Accum`. The core specification does not include built-in reducer functions, allowing implementations and users to define domain-specific reducers as needed.
 
 
 ## `sort`
@@ -789,14 +857,44 @@ to sort arrays of values based on a custom comparison function.
 
 An array of sorted values based on the comparison function.
 
-**Example:**
+**Examples:**
 
+Sorting instances by size (requires implementation-provided or custom comparison function):
+```yaml
+# Sort instances in ascending order by size
+sortedInstances: |
+  ${sort(
+    datasources.instances.items,
+    compare_instance_size
+  )}
 ```
-${sort(
-  datasources.network.subnets,
-  compare_cidr_ranges,
-)}
+
+Sorting availability zones (requires implementation-provided or custom comparison function):
+```yaml
+# Sort availability zones alphabetically
+sortedZones: |
+  ${sort(
+    datasources.region.availabilityZones,
+    compare_strings_alphabetically
+  )}
 ```
+
+Sorting resources by priority (requires implementation-provided or custom comparison function):
+```yaml
+# Sort resources by priority field in descending order
+prioritizedResources: |
+  ${sort(
+    datasources.resources.items,
+    compare_priority_desc
+  )}
+```
+
+**Note:** The `sort` function requires custom or implementation-provided comparison functions that match the signature `func<Item>(Item, Item) -> integer`. The comparison function should return:
+- **Negative integer** (e.g., -1) if first item should come before second item
+- **Positive integer** (e.g., 1) if first item should come after second item
+- **Zero** (0) if items are equal in sort order
+
+The core specification does not include built-in comparison functions, allowing implementations and users to define domain-specific comparators as needed.
 
 
 ## `flatmap`
@@ -963,7 +1061,7 @@ A function that takes an array and returns the value at the provided position.
 ```
 ${map(
   datasources.network.subnets,
-  compose(get_attr("id"), getelem(0))
+  compose(getattr("id"), getelem(0))
 )}
 ```
 
@@ -1045,6 +1143,17 @@ The result of the logical AND operation on the two boolean values.
 
 ```
 ${and(resources.orderApi.spec.isProd, eq(variables.environment, "prod"))}
+```
+
+**Handling `none` Values:**
+
+When any argument to `and` is `none`:
+- `none` is treated as falsy
+- If any argument is `none`, the result is `none` (propagates the absence)
+
+```yaml
+# If isDev is none, entire condition evaluates to none (falsy)
+shouldDeploy: ${and(isDev, eq(variables.region, "us-west-2"))}
 ```
 
 
@@ -1261,48 +1370,102 @@ values:
   # Define configuration objects separately
   productionConfig:
     type: object
-    value: ${object(
-      size="large",
-      replicas=3,
-      region="us-east-1",
-      backupEnabled=true,
-      monitoringLevel="detailed"
-    )}
+    value: |
+      ${object(
+        size="large",
+        replicas=3,
+        region="us-east-1",
+        backupEnabled=true,
+        monitoringLevel="detailed"
+      )}
   
   stagingConfig:
     type: object
-    value: ${object(
-      size="medium",
-      replicas=2,
-      region="us-west-2",
-      backupEnabled=true,
-      monitoringLevel="standard"
-    )}
+    value: |
+      ${object(
+        size="medium",
+        replicas=2,
+        region="us-west-2",
+        backupEnabled=true,
+        monitoringLevel="standard"
+      )}
   
   developmentConfig:
     type: object
-    value: ${object(
-      size="small",
-      replicas=1,
-      region="us-west-1",
-      backupEnabled=false,
-      monitoringLevel="basic"
-    )}
+    value: |
+      ${object(
+        size="small",
+        replicas=1,
+        region="us-west-1",
+        backupEnabled=false,
+        monitoringLevel="basic"
+      )}
   
   # Compose the final conditional using the helper values
   deploymentConfig:
     type: object
-    value: ${if(
-      values.isProduction,
-      values.productionConfig,
-      if(values.isStaging, values.stagingConfig, values.developmentConfig)
-    )}
+    value: |
+      ${if(
+        values.isProduction,
+        values.productionConfig,
+        if(values.isStaging, values.stagingConfig, values.developmentConfig)
+      )}
+```
+
+**Truthiness Rules:**
+
+The `if` function accepts only **boolean** or **`none`** values for the condition parameter:
+
+- `true` - Evaluates to true, returns the true branch
+- `false` - Evaluates to false, returns the false branch
+- `none` - Treated as falsy, returns the false branch
+
+**Note:** Unlike some programming languages, the `if` function does NOT support loose truthiness. Values like `0`, `""` (empty string), `[]` (empty array), or other "empty" values are NOT automatically converted to boolean. You must use explicit comparison functions like `eq()`, `not()`, etc., to produce boolean values.
+
+**Handling `none` Values:**
+
+The `if` function has special behavior with `none` values:
+
+1. **`none` in the condition**: Treated as falsy, returns the false branch
+2. **`none` in branches**: Can return `none` to conditionally omit fields
+
+*Condition is `none`:*
+```yaml
+# If customCondition is none → evaluates to false → returns "default"
+result: ${if(customCondition, "custom", "default")}
+```
+
+*Returning `none` for conditional field omission:*
+```yaml
+resources:
+  instance:
+    type: aws/ec2/instance
+    spec:
+      instanceType: t3.micro
+      # monitoring field only present in production
+      monitoring: ${if(eq(variables.env, "prod"), true, none)}
+```
+
+When `variables.env` is not `"prod"`, the `monitoring` field is completely omitted from the materialized blueprint.
+
+*Chaining with `coalesce()` for complex defaults:*
+```yaml
+# If override exists use it, otherwise conditional default, with final fallback
+timeout: |
+  ${coalesce(
+    variables.timeoutOverride,
+    if(eq(variables.env, "prod"), 60, 30)
+  )}
 ```
 
 ## `first`
 
 A function that returns the first non-empty value from a list of arguments.
-Empty values include empty strings (`""`) and empty arrays (`[]`).
+
+**Empty values** (which are skipped by `first`):
+- `none` - Explicit absence of a value
+- `""` - Empty string
+- `[]` - Empty array
 
 **Parameters:**
 
@@ -1343,42 +1506,172 @@ Configuration with sensible defaults:
 ${first(variables.logLevel, "info")}
 ```
 
-## `lookup`
+**Handling `none` Values:**
 
-A function that retrieves a value from a map/object using a key, with a required default value if the key is not found.
-You should use this function instead of `.` or `[]` accessors if you need to provide a default value if the key is not found.
+The `first` function treats `none` as an empty value and **skips it** when searching for the first non-empty value, just like it skips `""` and `[]`.
+
+**Examples demonstrating empty value skipping:**
+
+```yaml
+# All three empty values are skipped - returns "value"
+result: ${first(none, "", [], "value")}
+
+# Skips none, returns empty string (it's first non-none/non-[])
+result: ${first(none, [], "", "value")}
+
+# Only none values, returns last argument (none)
+result: ${first(none, none, none)}
+
+# Mixed with lookups that may return none
+apiEndpoint: |
+  ${first(
+    lookup(datasources.config.overrides, "apiEndpoint"),
+    variables.customEndpoint,
+    "https://api.default.com"
+  )}
+```
+
+This makes `first` particularly useful for fallback chains where earlier sources might not exist:
+
+```yaml
+# Try multiple config sources, use first available non-empty value
+timeout: |
+  ${first(
+    lookup(datasources.remoteConfig.settings, "timeout"),
+    lookup(variables.localConfig, "timeout"),
+    30
+  )}
+```
+
+## `coalesce`
+
+A function that returns the first non-`none` value from a list of arguments. Unlike `first`, this function **only** skips `none` values - empty strings (`""`), empty arrays (`[]`), and other empty values are considered valid and will be returned.
 
 **Parameters:**
 
-1. `mapping` - A map/object to look up the value from.
-2. `string` - The key to look up in the map/object.
-3. `any` - The default value to return if the key is not found.
+N arguments of any type that will be evaluated in order to find the first non-`none` value.
 
 **Returns:**
 
 `any`
 
-The value associated with the key in the map/object, or the default value if the key is not found.
+The first non-`none` value from the provided arguments. If all arguments are `none`, returns `none`.
 
 **Examples:**
 
-Basic lookup with default:
-```
-${lookup(values.environmentConfig, variables.environment, values.defaultConfig)}
+Providing defaults when values might be `none`:
+```yaml
+timeout: ${coalesce(lookup(config, "timeout"), 30)}
+endpoint: ${coalesce(variables.customEndpoint, "https://api.default.com")}
 ```
 
-Environment-specific resource sizing:
+Empty strings are valid (unlike with `first`):
+```yaml
+# If description is "" (empty string), it's returned (not skipped)
+description: ${coalesce(lookup(config, "description"), "No description")}
+
+# Compare with first() which would skip "" and return "No description"
+description: ${first(lookup(config, "description"), "No description")}
 ```
-${lookup(
-  object(
-    "production" = "large",
-    "staging" = "medium", 
-    "development" = "small"
-  ),
-  variables.environment,
-  "small"
-)}
+
+Chaining multiple sources:
+```yaml
+apiKey: |
+  ${coalesce(
+    lookup(datasources.secrets.prod, "apiKey"),
+    lookup(variables.overrides, "apiKey"),
+    "default-api-key"
+  )}
 ```
+
+**Comparison with `first`:**
+
+| Function | Skips `none` | Skips `""` | Skips `[]` | Use Case |
+|----------|-------------|-----------|-----------|----------|
+| `coalesce` | ✓ | ✗ | ✗ | Defaults for `none`, keep other empty values |
+| `first` | ✓ | ✓ | ✓ | Get first "meaningful" value, skip all empties |
+
+**Use `coalesce` when:**
+- You want to provide defaults specifically for `none` values
+- Empty strings or empty arrays are valid values you want to preserve
+- Working with optional configuration that might not be set
+
+**Use `first` when:**
+- You want to skip all kinds of empty values
+- Looking for the first "meaningful" or "useful" value
+- Empty strings/arrays are equivalent to "not set" in your context
+
+## `lookup`
+
+A function that retrieves a value from a map/object using a key. Returns `none` if the key is not found.
+
+**Parameters:**
+
+1. `mapping` - A map/object to look up the value from.
+2. `string` - The key to look up in the map/object.
+
+**Returns:**
+
+`any`
+
+The value associated with the key in the map/object, or `none` if the key is not found.
+
+**Examples:**
+
+Basic lookup (returns `none` if key not found):
+```yaml
+# Use with coalesce() to provide a default
+timeout: ${coalesce(lookup(config, "timeout"), 30)}
+```
+
+Environment-specific resource sizing with default:
+```yaml
+instanceSize: |
+  ${coalesce(
+    lookup(
+      object(
+        production="large",
+        staging="medium",
+        development="small"
+      ),
+      variables.environment
+    ),
+    "small"
+  )}
+```
+
+Chaining lookups with `first()`:
+```yaml
+# Try multiple config sources
+apiKey: |
+  ${first(
+    lookup(datasources.secrets.prod, "apiKey"),
+    lookup(variables.overrides, "apiKey"),
+    "default-api-key"
+  )}
+```
+
+**Handling `none` Values:**
+
+The `lookup` function returns `none` when:
+- The specified key does not exist in the map/object
+- The map/object itself is `none`
+
+This makes `lookup` the primary way to safely access optional configuration values:
+
+```yaml
+resources:
+  function:
+    spec:
+      # These fields use coalesce() to provide defaults when keys don't exist
+      timeout: ${coalesce(lookup(datasources.config.settings, "timeout"), 30)}
+      memorySize: ${coalesce(lookup(datasources.config.settings, "memory"), 512)}
+
+      # This field is omitted entirely if the key doesn't exist (lookup returns none)
+      description: ${lookup(datasources.config.metadata, "description")}
+```
+
+**Note:** Use `.` or `[]` accessors when you know the key exists and want an error if it doesn't. Use `lookup()` when the key might not exist and you want to handle that with `none`, `coalesce()`, or `first()`.
 
 ## `base64encode`
 
@@ -1883,6 +2176,125 @@ A string representing the current time in the requested format.
 ${datetime("tag")}
 ```
 
+
+## Special Values
+
+### `none`
+
+The `none` value is a special literal in the substitution language that represents the explicit absence of a value.
+
+**Syntax:**
+
+```yaml
+${none}
+```
+
+**Behavior:**
+
+When a substitution expression evaluates to `none`:
+- The field containing that substitution is **omitted** from the materialized blueprint
+- In string interpolation, `none` is treated as an empty string (`""`)
+- Most functions **propagate** `none` (if any argument is `none`, the result is `none`)
+- Some functions **handle** `none` specially (e.g., `or`, `if`, `first`)
+
+**Comparison Table:**
+
+| Value | Meaning | Field Presence in Output |
+|-------|---------|--------------------------|
+| `${none}` | Explicit absence | **Omitted** (not present) |
+| `""` | Empty string | Present with empty value |
+| `[]` | Empty array | Present with empty array |
+| `{}` | Empty object | Present with empty object |
+| `0` | Zero | Present with value 0 |
+| `false` | Boolean false | Present with value false |
+
+**String Interpolation:**
+
+In string interpolation, `none` is treated as an empty string (`""`):
+
+```yaml
+# If domain is none → becomes "https:///api" (empty string in place of none)
+url: "https://${domain}/api"
+
+# Use coalesce() to provide a meaningful default instead of empty string
+url: "https://${coalesce(domain, "localhost")}/api"
+```
+
+**Arrays:**
+
+When `none` appears as an array element, it is filtered out:
+
+```yaml
+items:
+  - required-item
+  - ${if(includeOptional, "optional-item", none)}
+  - another-item
+
+# When includeOptional is false:
+# Result: ["required-item", "another-item"]
+```
+
+**Objects:**
+
+When `none` appears as a value in an object, the key-value pair is omitted:
+
+```yaml
+config:
+  required: value
+  optional: ${if(condition, "value", none)}
+
+# When condition is false:
+# Result: {required: "value"}
+```
+
+**Function Behavior:**
+
+Functions fall into two categories regarding `none`:
+
+1. **Propagating functions** (most functions): Any `none` argument → `none` result
+   - String functions: `trim`, `replace`, `substr`, `to_upper`, `to_lower`, etc.
+   - Math functions: `min`, `max`, `abs`
+   - Encoding functions: `base64encode`, `sha256`, etc.
+
+2. **Handling functions**: Treat `none` specially
+   - `if(cond, a, b)` - Treats `none` condition as falsy
+   - `coalesce(...)` - Returns first non-`none` value (preserves `""`, `[]`, etc.)
+   - `first(...)` - Skips `none`, `""`, and `[]` (all "empty values"), returns first non-empty
+   - `lookup(obj, key)` - Returns `none` when key not found
+
+**Common Patterns:**
+
+*Conditional field omission:*
+```yaml
+resources:
+  instance:
+    spec:
+      monitoring: ${if(eq(variables.env, "prod"), true, none)}
+```
+
+*Providing defaults with `coalesce()`:*
+```yaml
+resources:
+  function:
+    spec:
+      timeout: ${coalesce(lookup(config, "timeout"), 30)}
+      memorySize: ${coalesce(variables.customMemory, 512)}
+```
+
+*Chaining fallbacks (skipping all empty values):*
+```yaml
+apiUrl: |
+  ${first(
+    lookup(config, "customUrl"),
+    variables.overrideUrl,
+    "https://api.default.com"
+  )}
+```
+
+**See Also:**
+
+- [Blueprint Specification: Substitution Grammar](/docs/bluelink/blueprints/specification#substitution-grammar) - Formal grammar including `none` literal
+- [Blueprint Specification: None Values and Field Omission](/docs/bluelink/blueprints/specification#none-values-and-field-omission) - Detailed behavioral documentation
 
 ## Clarification on `_g` functions
 

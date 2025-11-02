@@ -20,7 +20,7 @@ Relative paths are expected to be relative to the current working directory.
 
 **Type**: `string`
 
-**Default Value**: `bluelink.config.toml`
+**Default Value**: When a value is not provided, the CLI will search for a file as per the [configuration](/docs/cli/configuration#configuration-file) documentation.
 
 ### `--deploy-config-file`
 
@@ -80,7 +80,7 @@ The endpoint of the deploy engine api, this is used if `--connect-protocol` is s
 
 **Type**: `string`
 
-**Default Value**: `$HOME/.bluelink/clients/engine.auth.json`
+**Default Value**: `$HOME/.bluelink/config/engine.auth.json` on Linux or macOS and `%LOCALAPPDATA%\NewStack\Bluelink\config\engine.auth.json` on Windows.
 
 The path to the authentication configuration file for the deploy engine.
 This is used to authenticate with the deploy engine when using the `stage-changes`, `deploy`, `destroy` and `validate` commands.
@@ -483,6 +483,54 @@ If true, the destroy action will be treated as a rollback operation for a previo
 This can be used to indicate a rollback to a previous state where the current blueprint instance
 was deployed successfully but another part of the deployment failed, this typically happens when the current blueprint instance
 is a child of another blueprint instance that failed to deploy.
+
+## `sync`
+
+This is the command category for syncing deployment state between different environments.
+These commands are useful for sharing deployment state between different environments when adopting a local deployment strategy.
+A local deployment strategy is where the deploy engine is running on the same machine as the CLI when running commands such as `deploy` or `destroy`.
+
+An example use case would be a CI/CD pipeline that runs the `stage` and `deploy` commands for a blueprint deployment using a local deploy engine installation
+in the container or VM for the job.
+Through the use of these commands, the pipeline can import the deployment state from the previous run of the pipeline and deploy it to the same environment.
+
+### `import`
+
+This command is used to import the entire state or specific blueprint instances from a local file or a remote source.
+
+An example of importing the entire state from a local file:
+```bash
+bluelink sync import --file ./deployment-state.tar.gz
+```
+
+An example of importing one or more specific blueprint deployment instances from a remote source:
+```bash
+# The input file should be in the JSON format exported
+# by the `export` command with the `--instances [idOrName1,idOrName2,...]` flag.
+bluelink sync import --instances --file s3://bucket-name/path/to/instances-export.json
+```
+
+#### `--instances`
+
+#### `--file`
+
+### `export`
+
+This command is used to export the entire state or specific blueprint instances to be shared between environments.
+
+An example of exporting the entire state to a local file:
+```bash
+bluelink sync export --file ./deployment-state.tar.gz
+```
+
+An example of exporting one or more specific blueprint deployment instances to a remote source:
+```bash
+bluelink sync export --instances stack-1,stack-2,stack-3 --file s3://bucket-name/path/to/instances-export.json
+```
+
+#### `--instances`
+
+#### `--file`
 
 ## `plugins`
 

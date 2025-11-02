@@ -3,7 +3,7 @@ title: Specification
 description: The blueprint language specification
 ---
 
-**v2025-05-12-draft**
+**v2025-11-02**
 
 This section provides the first version of the Blueprint Specification with accompanying examples.
 
@@ -55,9 +55,9 @@ string
 
 **allowed values** 
 
-2025-05-12-draft
+2025-11-02
 
-For the v2025-05-12-draft version of the specification, the only valid value is `2025-05-12-draft`.
+For the v2025-11-02 version of the specification, the only valid value is `2025-11-02`.
 
 ### transform
 
@@ -105,7 +105,7 @@ JSON With Commas and Comments
 ```javascript
 {
   // The initial version of the blueprint spec.
-  "version": "2025-05-12",
+  "version": "2025-11-02",
   // The transform to be applied to the blueprint.
   "transform": "celerity-2026-02-28",
   "variables": {
@@ -1614,7 +1614,7 @@ Remote file system example:
 # main-blueprint.yaml
 include:
   coreInfrastructure:
-    path: core-infra-2025-05-12.yaml
+    path: core-infra-2025-11-02.yaml
     metadata:
       sourceType: aws/s3
       bucket: order-system-blueprints
@@ -1846,7 +1846,7 @@ In these cases the filter operation should fail and the implementation should re
 
 <NonLinkableHeading>Starts With Operators ( starts with | not starts with )</NonLinkableHeading>
 
-The same rules apply to the `starts with` and `not starts with` operators, `not contains` will be the negation of the behaviour for the comparisons described below.
+The same rules apply to the `starts with` and `not starts with` operators, `not starts with` will be the negation of the behaviour for the comparisons described below.
 
 _field(string) **starts with** search(string)_
 
@@ -2809,6 +2809,179 @@ metadata:
 
 <br/>
 
+### None Values and Field Omission
+
+The `none` literal value in the substitution language provides a way to explicitly represent the absence of a value. When a substitution evaluates to `none`, the behavior depends on the context in which it appears.
+
+#### Field Omission at Materialisation
+
+When a field's value evaluates to `none`, that field is **completely omitted** from the final materialised blueprint output:
+
+<Callout title="Example" type="info">
+```yaml
+resources:
+  instance:
+    type: aws/ec2/instance
+    spec:
+      instanceType: t3.micro
+      monitoring: ${if(eq(variables.env, "prod"), true, none)}
+```
+
+When `variables.env` is `"dev"`, the materialized output omits the `monitoring` field entirely:
+
+```yaml
+resources:
+  instance:
+    type: aws/ec2/instance
+    spec:
+      instanceType: t3.micro
+      # monitoring field is not present
+```
+</Callout>
+
+This is fundamentally different from setting a field to an empty value like `""` or `false`, which would include the field with that empty value.
+
+#### None in String Interpolation
+
+When `none` appears within a string interpolation expression, it is **treated as an empty string** (`""`):
+
+<Callout title="Info" type="info">
+```yaml
+resources:
+  api:
+    type: aws/apigateway/restapi
+    spec:
+      # If customDomain is none, it becomes an empty string in the interpolation
+      url: "https://${customDomain}/api/v1"
+```
+
+If `customDomain` evaluates to `none`, the result is `"https:///api/v1"` (note the double slashes).
+</Callout>
+
+The field is always present for string interpolation, and `none` values simply contribute nothing to the string.
+
+If you want to provide a default value when a variable might be `none`, use the `or()` function:
+
+<Callout title="Tip" type="info">
+```yaml
+resources:
+  api:
+    type: aws/apigateway/restapi
+    spec:
+      # If customDomain is none, use "localhost" instead
+      url: "https://${or(customDomain, "localhost")}/api/v1"
+```
+
+Result when `customDomain` is `none`: `"https://localhost/api/v1"`
+</Callout>
+
+#### None in Arrays
+
+When `none` values appear as elements in array literals or array-valued substitutions, they are **filtered out** from the final array:
+
+```yaml
+resources:
+  securityGroup:
+    type: aws/ec2/securitygroup
+    spec:
+      ingressRules:
+        - port: 443
+          protocol: tcp
+        - ${if(eq(variables.env, "dev"), {port: 22, protocol: "tcp"}, none)}
+        - port: 80
+          protocol: tcp
+```
+
+When `variables.env` is `"prod"`, the `none` element is filtered out, resulting in an array with 2 rules instead of 3.
+
+#### None in Objects
+
+When `none` values appear as values in object/mapping literals, the corresponding key-value pair is **omitted** from the final object:
+
+```yaml
+resources:
+  lambda:
+    type: aws/lambda/function
+    spec:
+      functionName: myFunction
+      environment:
+        NODE_ENV: ${variables.nodeEnv}
+        DEBUG_MODE: ${if(eq(variables.env, "dev"), "true", none)}
+        LOG_LEVEL: info
+```
+
+When `variables.env` is `"prod"`, the `DEBUG_MODE` key is omitted from the `environment` object.
+
+#### Common Patterns
+
+**Conditional field presence:**
+
+```yaml
+# Only include tags in production
+resources:
+  bucket:
+    type: aws/s3/bucket
+    spec:
+      bucketName: my-bucket
+      tags: ${if(eq(variables.env, "prod"), values.prodTags, none)}
+```
+
+**Using `coalesce()` for defaults:**
+
+```yaml
+# Provide default when value might be none
+resources:
+  function:
+    type: aws/lambda/function
+    spec:
+      timeout: ${coalesce(variables.customTimeout, 30)}
+      memorySize: ${coalesce(variables.customMemory, 512)}
+```
+
+#### Tips
+
+<Callout title="Tip" type="info">
+**Choosing between `none` and `""` for fallback values:**
+
+Use `none` when you want the field to be **omitted** from the output:
+```yaml
+# Field not present when condition is false
+optionalDescription: ${if(hasDescription, description, none)}
+```
+
+Use `""` (empty string) when you want the field to be **present but empty**:
+```yaml
+# Field present with empty value when condition is false
+description: ${if(hasDescription, description, "")}
+```
+
+**Rule of thumb:** If the field's absence vs. presence matters to the consuming system, use `none` for conditional omission. If the field should always be present, use `""` or another appropriate empty value.
+</Callout>
+
+<Callout title="Tip" type="info">
+**Remember: `none` becomes empty string in interpolation:**
+
+When `none` appears in string interpolation, it is treated as `""`:
+
+```yaml
+# If domain is none → "https:///api" (note the double slashes)
+url: "https://${domain}/api"
+
+# Better: provide a meaningful default with coalesce()
+url: "https://${coalesce(domain, "localhost")}/api"
+```
+
+This is especially important for URLs, file paths, and other formatted strings where an empty segment might be invalid or confusing.
+</Callout>
+
+#### See Also
+
+- [Substitution Grammar](#substitution-grammar) - Formal grammar including `none` literal
+- [Core Functions: Special Values](/docs/bluelink/blueprints/core-functions#special-values) - Detailed `none` value documentation
+- [Core Functions](/docs/bluelink/blueprints/core-functions) - Functions that handle `none` values
+
+<br/>
+
 ### Substitution Grammar
 
 Substitutions are made up of a small language that can be defined formally as a [context-free grammar](https://web.stanford.edu/class/archive/cs/cs103/cs103.1164/lectures/18/Small18.pdf).
@@ -2832,7 +3005,7 @@ resource reference           =   resource name , [ { ( name accessor | index ace
 resource name                =   ( "resources." , name accessor ) | name ;
 name accessor                =   ( "." , name ) | ( "[" , name in quotes , "]" ) ;
 index accessor               =   "[" , [ natural number ] , "]" ;
-literal                      =   bool literal | float literal | int literal | string literal ;
+literal                      =   bool literal | float literal | int literal | string literal | none literal ;
 
 # Lex tokens
 
@@ -2840,6 +3013,7 @@ string literal               =   '"' , string chars , '"' ;
 bool literal                 =   "true" | "false" ;
 int literal                  =   [ "-" ] , natural number ;
 float literal                =   [ "-" ] , natural number , "." , natural number ;
+none literal                 =   "none" ;
 natural number               =   { digit }- ;
 string chars                 =   { string char } ;
 string char                  =   ? utf-8 char excluding quote ? | escaped quote ;
@@ -2867,7 +3041,7 @@ The portable substitution language is sufficient for referencing elements in a b
 
 ## Modular Blueprints
 
-A blueprint does not neccessarily need to be a single file, it can be split into multiple files and directories.
+A blueprint does not necessarily need to be a single file, it can be split into multiple files and directories.
 
 Making blueprints modular is useful for organising blueprints into logical groups and for reusing common parts of a blueprint across multiple blueprints.
 
@@ -2892,7 +3066,7 @@ The following section contains a set of examples of how you can pull in one or m
 `main-blueprint.yaml`
 
 ```yaml
-version: 2025-05-12
+version: 2025-11-02
 
 variables:
 
@@ -2943,7 +3117,7 @@ exports:
 
 `core-infra.yaml`
 ```yaml
-version: 2025-05-12
+version: 2025-11-02
 
 variables:
     orderTopicType:
@@ -2971,7 +3145,7 @@ exports:
 `app-infra.yaml`
 
 ```yaml
-version: 2025-05-12
+version: 2025-11-02
 
 variables:
   region:
@@ -3010,7 +3184,7 @@ exports:
 `app-infra/main-blueprint.yaml`
 
 ```yaml
-version: 2025-05-12
+version: 2025-11-02
 
 variables:
 
@@ -3068,7 +3242,7 @@ exports:
 
 `core-infra/topics.yaml`
 ```yaml
-version: 2025-05-12
+version: 2025-11-02
 
 variables:
   orderTopicType:
@@ -3095,7 +3269,7 @@ exports:
 
 `core-infra/event-bus.yaml`
 ```yaml
-version: 2025-05-12
+version: 2025-11-02
 
 variables:
   eventBus:
@@ -3120,7 +3294,7 @@ exports:
 `app-infra/api.yaml`
 
 ```yaml
-version: 2025-05-12
+version: 2025-11-02
 
 variables:
   region:
@@ -3158,7 +3332,7 @@ For example, if the remote source was an AWS S3 bucket:
 ```yaml
 include:
   coreInfrastructure:
-    path: core-infra-2025-05-12.yaml
+    path: core-infra-2025-11-02.yaml
     metadata:
       sourceType: aws/s3
       bucket: order-system-blueprints
@@ -3177,7 +3351,7 @@ The following is an example of how an implementation might go about supporting b
 
 
 ```yaml
-version: 2025-05-12
+version: 2025-11-02
 variables:
 
   region:
