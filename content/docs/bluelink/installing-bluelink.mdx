@@ -2,3 +2,584 @@
 title: Installing Bluelink
 description: How to install Bluelink for multiple platforms
 ---
+
+Bluelink can be installed in several ways depending on your needs. Choose the method that works best for you.
+
+## Installation Options
+
+There are three ways to install Bluelink:
+
+1. **Easy Install (Recommended)** - Use the one-line installer script or Windows installer
+2. **Using Bluelink Manager** - Download the manager binary and use it to install components
+3. **Manual Installation** - Download and configure each component individually
+
+## Easy Install (Recommended)
+
+For the quickest setup, follow the installation instructions in the [Quick Start guide](/docs/bluelink). This uses a single command to install everything you need.
+
+## Using Bluelink Manager
+
+The Bluelink Manager is a cross-platform CLI tool that handles the installation, updating, and management of all Bluelink components. It manages:
+
+- **Bluelink CLI** - The command-line interface for infrastructure management
+- **Deploy Engine** - A background service that handles deployments
+- **Blueprint Language Server** - Provides IDE support for blueprint files
+
+### Installing the Manager
+
+<InstallBluelink matchPlatform="mac">
+
+To install the Bluelink Manager on macOS, run the following command:
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSfL https://manager-sh.bluelink.dev | sh
+```
+
+This will download and install the Bluelink Manager, which will then install all other components automatically.
+
+</InstallBluelink>
+
+<InstallBluelink matchPlatform="linux">
+
+To install the Bluelink Manager on Linux, run the following command:
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSfL https://manager-sh.bluelink.dev | sh
+```
+
+This will download and install the Bluelink Manager, which will then install all other components automatically.
+
+</InstallBluelink>
+
+<InstallBluelink matchPlatform="windows">
+
+For Windows, download and run the MSI installer:
+
+<WindowsInstallerDownload />
+
+The installer will:
+- Install the Bluelink Manager
+- Set up a startup application
+- Prepare all necessary directories
+- Configure the Deploy Engine as a Windows Service
+
+Alternatively, you can use Windows Subsystem for Linux (WSL) and run:
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSfL https://manager-sh.bluelink.dev | sh
+```
+
+</InstallBluelink>
+
+<InstallBluelink isDefault>
+
+To install the Bluelink Manager on macOS, Linux, or another Unix-like OS, run the following command:
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSfL https://manager-sh.bluelink.dev | sh
+```
+
+This will download and install the Bluelink Manager, which will then install all other components automatically.
+
+</InstallBluelink>
+
+### Manual Download
+
+If you prefer to download the Bluelink Manager binary directly, you can find the latest releases below:
+
+<ReleaseTable component="bluelink-manager" />
+
+<VerificationInstructions />
+
+### Post-Installation (Manual Download Only)
+
+If you downloaded the Bluelink Manager binary manually (rather than using the shell script or Windows installer), you'll need to run the install command:
+
+<InstallBluelink matchPlatform="mac">
+
+```bash
+# If bluelink-manager is in your PATH
+bluelink-manager install
+
+# Or use the full path to the binary
+./bluelink-manager install
+```
+
+</InstallBluelink>
+
+<InstallBluelink matchPlatform="linux">
+
+```bash
+# If bluelink-manager is in your PATH
+bluelink-manager install
+
+# Or use the full path to the binary
+./bluelink-manager install
+```
+
+</InstallBluelink>
+
+<InstallBluelink matchPlatform="windows">
+
+```powershell
+# If bluelink-manager is in your PATH
+bluelink-manager install
+
+# Or use the full path to the binary
+.\bluelink-manager.exe install
+```
+
+</InstallBluelink>
+
+<InstallBluelink isDefault>
+
+```bash
+# If bluelink-manager is in your PATH
+bluelink-manager install
+
+# Or use the full path to the binary
+./bluelink-manager install
+```
+
+</InstallBluelink>
+
+The shell script and Windows installer handle PATH configuration and run this command automatically, so you can skip this step if you used one of those methods.
+
+This will download and install:
+- The Bluelink CLI
+- The Deploy Engine (configured as a background service)
+- The Blueprint Language Server
+- Core Deploy Engine plugins
+
+You can verify the installation by running:
+
+```bash
+bluelink-manager status
+```
+
+### Managing Components
+
+The Bluelink Manager provides several commands for managing your installation:
+
+```bash
+# Update all components to the latest versions
+bluelink-manager update
+
+# Start the Deploy Engine service
+bluelink-manager start
+
+# Stop the Deploy Engine service
+bluelink-manager stop
+
+# Restart the Deploy Engine service
+bluelink-manager restart
+
+# Update the manager itself
+bluelink-manager self-update
+
+# Uninstall all components
+bluelink-manager uninstall
+```
+
+## Installing Components Individually
+
+For advanced users who want granular control over the installation, you can download and install each component separately.
+
+### Prerequisites
+
+Before installing components manually, you need to set up the directory structure.
+
+<InstallBluelink matchPlatform="mac">
+
+On macOS, create the following directory structure:
+
+```bash
+mkdir -p ~/.bluelink/bin
+mkdir -p ~/.bluelink/config
+mkdir -p ~/.bluelink/engine/plugins
+mkdir -p ~/.bluelink/engine/state
+```
+
+Add the bin directory to your PATH by adding this to your `~/.zshrc` or `~/.bashrc`:
+
+```bash
+export PATH="$HOME/.bluelink/bin:$PATH"
+```
+
+</InstallBluelink>
+
+<InstallBluelink matchPlatform="linux">
+
+On Linux, create the following directory structure:
+
+```bash
+mkdir -p ~/.bluelink/bin
+mkdir -p ~/.bluelink/config
+mkdir -p ~/.bluelink/engine/plugins
+mkdir -p ~/.bluelink/engine/state
+```
+
+Add the bin directory to your PATH by adding this to your `~/.bashrc` or `~/.zshrc`:
+
+```bash
+export PATH="$HOME/.bluelink/bin:$PATH"
+```
+
+</InstallBluelink>
+
+<InstallBluelink matchPlatform="windows">
+
+On Windows, the default installation directory is `%LOCALAPPDATA%\NewStack\Bluelink\`. Create the following structure:
+
+```powershell
+New-Item -ItemType Directory -Force -Path "$env:LOCALAPPDATA\NewStack\Bluelink\bin"
+New-Item -ItemType Directory -Force -Path "$env:LOCALAPPDATA\NewStack\Bluelink\config"
+New-Item -ItemType Directory -Force -Path "$env:LOCALAPPDATA\NewStack\Bluelink\engine\plugins"
+New-Item -ItemType Directory -Force -Path "$env:LOCALAPPDATA\NewStack\Bluelink\engine\state"
+```
+
+Add the bin directory to your PATH through System Properties or by running:
+
+```powershell
+[Environment]::SetEnvironmentVariable("Path", $env:Path + ";$env:LOCALAPPDATA\NewStack\Bluelink\bin", "User")
+```
+
+</InstallBluelink>
+
+<InstallBluelink isDefault>
+
+Create the following directory structure:
+
+```bash
+mkdir -p ~/.bluelink/bin
+mkdir -p ~/.bluelink/config
+mkdir -p ~/.bluelink/engine/plugins
+mkdir -p ~/.bluelink/engine/state
+```
+
+Add the bin directory to your PATH:
+
+```bash
+export PATH="$HOME/.bluelink/bin:$PATH"
+```
+
+</InstallBluelink>
+
+### Bluelink CLI
+
+The Bluelink CLI is the primary interface for working with blueprints and deployments.
+
+<ReleaseTable component="cli" />
+
+After downloading, extract the archive and move the `bluelink` binary to your bin directory:
+
+<InstallBluelink matchPlatform="mac">
+
+```bash
+# Extract and install (example for Apple Silicon)
+tar -xzf bluelink-cli_*.tar.gz
+mv bluelink ~/.bluelink/bin/
+chmod +x ~/.bluelink/bin/bluelink
+```
+
+</InstallBluelink>
+
+<InstallBluelink matchPlatform="linux">
+
+```bash
+# Extract and install
+tar -xzf bluelink-cli_*.tar.gz
+mv bluelink ~/.bluelink/bin/
+chmod +x ~/.bluelink/bin/bluelink
+```
+
+</InstallBluelink>
+
+<InstallBluelink matchPlatform="windows">
+
+```powershell
+# Extract and install
+Expand-Archive -Path bluelink-cli_*.zip -DestinationPath .
+Move-Item bluelink.exe "$env:LOCALAPPDATA\NewStack\Bluelink\bin\"
+```
+
+</InstallBluelink>
+
+<InstallBluelink isDefault>
+
+```bash
+# Extract and install
+tar -xzf bluelink-cli_*.tar.gz
+mv bluelink ~/.bluelink/bin/
+chmod +x ~/.bluelink/bin/bluelink
+```
+
+</InstallBluelink>
+
+### Deploy Engine
+
+The Deploy Engine is a background service that manages infrastructure deployments.
+
+<ReleaseTable component="deploy-engine" />
+
+After downloading, extract and install the binary, then configure it as a service:
+
+<InstallBluelink matchPlatform="mac">
+
+```bash
+# Extract and install
+tar -xzf deploy-engine_*.tar.gz
+mv deploy-engine ~/.bluelink/bin/
+chmod +x ~/.bluelink/bin/deploy-engine
+
+# Create a launchd service
+cat > ~/Library/LaunchAgents/dev.bluelink.deploy-engine.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>dev.bluelink.deploy-engine</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${HOME}/.bluelink/bin/deploy-engine</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>WorkingDirectory</key>
+    <string>${HOME}/.bluelink/engine</string>
+</dict>
+</plist>
+EOF
+
+# Load the service
+launchctl load ~/Library/LaunchAgents/dev.bluelink.deploy-engine.plist
+```
+
+</InstallBluelink>
+
+<InstallBluelink matchPlatform="linux">
+
+```bash
+# Extract and install
+tar -xzf deploy-engine_*.tar.gz
+mv deploy-engine ~/.bluelink/bin/
+chmod +x ~/.bluelink/bin/deploy-engine
+
+# Create a systemd user service
+mkdir -p ~/.config/systemd/user
+cat > ~/.config/systemd/user/bluelink-deploy-engine.service << 'EOF'
+[Unit]
+Description=Bluelink Deploy Engine
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=%h/.bluelink/bin/deploy-engine
+WorkingDirectory=%h/.bluelink/engine
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+EOF
+
+# Enable and start the service
+systemctl --user daemon-reload
+systemctl --user enable bluelink-deploy-engine
+systemctl --user start bluelink-deploy-engine
+```
+
+</InstallBluelink>
+
+<InstallBluelink matchPlatform="windows">
+
+```powershell
+# Extract and install
+Expand-Archive -Path deploy-engine_*.zip -DestinationPath .
+Move-Item deploy-engine.exe "$env:LOCALAPPDATA\NewStack\Bluelink\bin\"
+
+# Register as a Windows Service (requires Administrator)
+sc.exe create BluelinkDeployEngine binPath= "$env:LOCALAPPDATA\NewStack\Bluelink\bin\deploy-engine.exe" start= auto
+sc.exe start BluelinkDeployEngine
+```
+
+</InstallBluelink>
+
+<InstallBluelink isDefault>
+
+```bash
+# Extract and install
+tar -xzf deploy-engine_*.tar.gz
+mv deploy-engine ~/.bluelink/bin/
+chmod +x ~/.bluelink/bin/deploy-engine
+```
+
+Configure as a background service appropriate for your system.
+
+</InstallBluelink>
+
+### Blueprint Language Server
+
+The Blueprint Language Server provides IDE support for `.blueprint.(yaml|yml|jsonc)` files.
+
+<ReleaseTable component="blueprint-ls" />
+
+After downloading, extract and install the binary:
+
+<InstallBluelink matchPlatform="mac">
+
+```bash
+# Extract and install
+tar -xzf blueprint-ls_*.tar.gz
+mv blueprint-ls ~/.bluelink/bin/
+chmod +x ~/.bluelink/bin/blueprint-ls
+```
+
+</InstallBluelink>
+
+<InstallBluelink matchPlatform="linux">
+
+```bash
+# Extract and install
+tar -xzf blueprint-ls_*.tar.gz
+mv blueprint-ls ~/.bluelink/bin/
+chmod +x ~/.bluelink/bin/blueprint-ls
+```
+
+</InstallBluelink>
+
+<InstallBluelink matchPlatform="windows">
+
+```powershell
+# Extract and install
+Expand-Archive -Path blueprint-ls_*.zip -DestinationPath .
+Move-Item blueprint-ls.exe "$env:LOCALAPPDATA\NewStack\Bluelink\bin\"
+```
+
+</InstallBluelink>
+
+<InstallBluelink isDefault>
+
+```bash
+# Extract and install
+tar -xzf blueprint-ls_*.tar.gz
+mv blueprint-ls ~/.bluelink/bin/
+chmod +x ~/.bluelink/bin/blueprint-ls
+```
+
+</InstallBluelink>
+
+Configure your IDE to use the language server. The exact configuration depends on your IDE - consult your IDE's documentation for configuring custom language servers.
+
+A VSCode extension for Bluelink is coming soon, which will provide automatic language server integration and additional features for working with blueprint files.
+
+<VerificationInstructions />
+
+## Directory Structure
+
+After installation, your Bluelink directory will have the following structure:
+
+<InstallBluelink matchPlatform="mac">
+
+```
+~/.bluelink/
+├── bin/
+│   ├── bluelink           # CLI binary
+│   ├── deploy-engine      # Deploy Engine binary
+│   └── blueprint-ls       # Language Server binary
+├── config/                # CLI configuration
+└── engine/
+    ├── plugins/           # Deploy Engine plugins
+    └── state/             # Deployment state
+```
+
+</InstallBluelink>
+
+<InstallBluelink matchPlatform="linux">
+
+```
+~/.bluelink/
+├── bin/
+│   ├── bluelink           # CLI binary
+│   ├── deploy-engine      # Deploy Engine binary
+│   └── blueprint-ls       # Language Server binary
+├── config/                # CLI configuration
+└── engine/
+    ├── plugins/           # Deploy Engine plugins
+    └── state/             # Deployment state
+```
+
+</InstallBluelink>
+
+<InstallBluelink matchPlatform="windows">
+
+```
+%LOCALAPPDATA%\NewStack\Bluelink\
+├── bin\
+│   ├── bluelink.exe           # CLI binary
+│   ├── deploy-engine.exe      # Deploy Engine binary
+│   └── blueprint-ls.exe       # Language Server binary
+├── config\                    # CLI configuration
+└── engine\
+    ├── plugins\               # Deploy Engine plugins
+    └── state\                 # Deployment state
+```
+
+</InstallBluelink>
+
+<InstallBluelink isDefault>
+
+```
+~/.bluelink/
+├── bin/
+│   ├── bluelink           # CLI binary
+│   ├── deploy-engine      # Deploy Engine binary
+│   └── blueprint-ls       # Language Server binary
+├── config/                # CLI configuration
+└── engine/
+    ├── plugins/           # Deploy Engine plugins
+    └── state/             # Deployment state
+```
+
+</InstallBluelink>
+
+## Running Deploy Engine in Docker
+
+The Deploy Engine can also be run as a Docker container, which is useful for containerised environments or if you prefer not to install it directly on your system.
+
+### Pulling the Image
+
+The Deploy Engine container image is available from GitHub Container Registry:
+
+```bash
+# Pull the latest stable release
+docker pull ghcr.io/newstack-cloud/deploy-engine:latest
+
+# Or pull the nightly build for the latest features
+docker pull ghcr.io/newstack-cloud/deploy-engine:nightly
+```
+
+### Running the Container
+
+```bash
+docker run -d \
+  --name deploy-engine \
+  -p 8080:8080 \
+  -v ~/.bluelink/engine:/data \
+  ghcr.io/newstack-cloud/deploy-engine:latest
+```
+
+For more available image tags and versions, see the [Deploy Engine container registry](https://github.com/newstack-cloud/bluelink/pkgs/container/deploy-engine).
+
+For configuration options and environment variables, see the [Deploy Engine README](https://github.com/newstack-cloud/bluelink/blob/main/apps/deploy-engine/README.md).
+
+## Next Steps
+
+Once you have Bluelink installed, you can:
+
+- Follow the [Quick Start guide](/docs/bluelink) to create your first blueprint project
+- Learn about [Blueprints](/docs/bluelink/blueprints) and how to define infrastructure
+- Explore the [CLI reference](/docs/cli/reference) for available commands
+- Configure [Deploy Engine plugins](/docs/plugin-framework/plugin-system) for your cloud providers

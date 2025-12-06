@@ -87,6 +87,24 @@ Whenever changes are made to the OpenAPI specification, you must run this comman
 
 The source OpenAPI specification can be found in the `api-docs` directory.
 
+## Fetching Release Data
+
+The installation page displays download links and version information for Bluelink components. This data is fetched from GitHub releases at build time and stored in `src/data/releases.json`.
+
+This file is not committed to version control and is generated automatically during the deploy workflow. To generate it locally for development:
+
+```bash
+yarn fetch-releases
+```
+
+This will fetch the latest releases from GitHub and write them to `src/data/releases.json`. You may need to set the `GITHUB_TOKEN` environment variable if you hit rate limits:
+
+```bash
+GITHUB_TOKEN=your_token yarn fetch-releases
+```
+
+The `yarn build` command automatically runs `fetch-releases` as part of the build process.
+
 ## Learn More
 
 To learn more about Next.js and Fumadocs, take a look at the following

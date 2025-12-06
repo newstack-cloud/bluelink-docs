@@ -5,6 +5,7 @@
 .contentlayer
 .content-collections
 .source
+src/data/releases.json
 
 # test & build
 /coverage

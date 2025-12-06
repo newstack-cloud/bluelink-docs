@@ -5,7 +5,9 @@ import type { MDXComponents } from 'mdx/types';
 import { APIPage } from 'fumadocs-openapi/ui';
 import { openapi } from '@/lib/open-api';
 import InstallBluelink from '@/components/install-bluelink';
-import DownloadBluelinkInstallerWindows from '@/components/download-bluelink-installer-windows';
+import ReleaseTable from '@/components/releases/release-table';
+import WindowsInstallerDownload from '@/components/releases/windows-installer-download';
+import VerificationInstructions from '@/components/releases/verification-instructions';
 
 // use this function to get MDX components, you will need it for rendering MDX
 export function getMDXComponents(components?: MDXComponents): MDXComponents {
@@ -28,7 +30,9 @@ export function getMDXComponents(components?: MDXComponents): MDXComponents {
     VersionBadge: (props) => <VersionBadge {...props} />,
     APIPage: (props) => <APIPage {...openapi.getAPIPageProps(props)} />,
     InstallBluelink,
-    DownloadBluelinkInstallerWindows,
+    ReleaseTable,
+    WindowsInstallerDownload,
+    VerificationInstructions,
   };
 }
 

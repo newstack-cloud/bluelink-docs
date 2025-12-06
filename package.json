@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "build": "yarn check-links && next build && yarn post-build && yarn sync-content",
+    "build": "yarn fetch-releases && yarn check-links && next build && yarn post-build && yarn sync-content",
     "dev": "next dev --turbo",
     "start": "next start",
     "postinstall": "fumadocs-mdx",
@@ -11,7 +11,8 @@
     "sync-content": "node scripts/sync-content.mjs",
     "check-links": "node scripts/check-links.mjs",
     "post-build": "bash scripts/post-build.sh",
-    "generate-api-docs": "node scripts/generate-api-docs.mjs"
+    "generate-api-docs": "node scripts/generate-api-docs.mjs",
+    "fetch-releases": "node scripts/fetch-releases.mjs"
   },
   "dependencies": {
     "@fumadocs/mdx-remote": "^1.4.0",
