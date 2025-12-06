@@ -8,9 +8,9 @@ Other use cases for authentication may arise over time.
 
 ## Overview
 
-The Bluelink CLI supports authentication via the `bluelink login {host}` command, where host is expected to be a host that contains a service discovery document as per the [Service Discovery Protocol](/docs/plugin-framework/service-discovery-protocol).
+The Bluelink CLI supports authentication via the `bluelink plugins login {host}` command, where host is expected to be a host that contains a service discovery document as per the [Service Discovery Protocol](/docs/plugin-framework/service-discovery-protocol).
 
-The `bluelink login {host}` command will prompt the user to enter the necessary configuration to be stored in the `$HOME/.bluelink/auth.json` file or will take them through the OAuth 2 authorization code flow to obtain an access token depending on the configuration provided in the service discovery document.
+The `bluelink plugins login {host}` command will prompt the user to enter the necessary configuration to be stored in the `$HOME/.bluelink/clients/plugins.auth.json` file (`%LOCALAPPDATA%\NewStack\Bluelink\clients\plugins.auth.json` on Windows) or will take them through the OAuth 2 authorization code flow to obtain an access token depending on the configuration provided in the service discovery document.
 
 ## Auth Configuration
 
@@ -29,9 +29,9 @@ For OAuth2, only the `client_credentials` and `authorization_code` grant types a
 }
 ```
 
-On the client side (e.g. environment running the Bluelink CLI), the API key must be set in the `$HOME/.bluelink/auth.json` file with a mapping of the host to the API key as follows:
+On the client side (e.g. environment running the Bluelink CLI), the API key must be set in the `$HOME/.bluelink/clients/plugins.auth.json` (Linux or macOS) or `%LOCALAPPDATA%\NewStack\Bluelink\clients\plugins.auth.json` (Windows) file with a mapping of the host to the API key as follows:
 
-```json title="$HOME/.bluelink/auth.json"
+```json title="$HOME/.bluelink/clients/plugins.auth.json"
 {
   "registry.bluelink.dev": {
     "apiKey": "{api-key}"
@@ -53,9 +53,9 @@ This API key will then be used to authenticate requests to the registry service 
 }
 ```
 
-On the client side (e.g. environment running the Bluelink CLI), the OAuth 2 client credentials must be set in the `$HOME/.bluelink/auth.json` file with a mapping of the host to the client credentials as follows:
+On the client side (e.g. environment running the Bluelink CLI), the OAuth 2 client credentials must be set in the `plugins.auth.json` file with a mapping of the host to the client credentials as follows:
 
-```json title="$HOME/.bluelink/auth.json"
+```json title="$HOME/.bluelink/clients/plugins.auth.json"
 {
   "registry.bluelink.dev": {
     "oauth2": {
@@ -87,7 +87,7 @@ There is no need to set any configuration on the client-side for the OAuth 2 Aut
 The following are the properties that can be provided in the `auth.v1` object:
 
 - `endpoint` (Optional) - The endpoint to use for an OAuth 2 flow. If omitted, and the `apiKeyHeader` is not provided, the client will use the same requested host that contains the service discovery document.
-- `clientId` (Required for OAuth) - The client ID to use for an OAuth 2 flow as per [RFC 6749](https://datatracker.ietf.org/doc/html/rfc6749#section-2.2). This is only required for the `authorization_code` flow as the user must specify the client ID for the `client_credentials` flow in the `$HOME/.bluelink/auth.json` file.
+- `clientId` (Required for OAuth) - The client ID to use for an OAuth 2 flow as per [RFC 6749](https://datatracker.ietf.org/doc/html/rfc6749#section-2.2). This is only required for the `authorization_code` flow as the user must specify the client ID for the `client_credentials` flow in the `$HOME/.bluelink/clients/plugins.auth.json` (Linux or macOS) or `%LOCALAPPDATA%\NewStack\Bluelink\clients\plugins.auth.json` (Windows) file.
 - `grantTypes` (Optional) - A list of grant types that the service supports. The supported grant types are `client_credentials` and `authorization_code`. If omitted, the client will default to the `authorization_code` grant type.
 - `authorize` (Optional) - The path to use for the authorization step in the OAuth 2 flow. If omitted, the client will default to `/authorize`.
 - `token` (Required for OAuth) - The path to use for the token step in the OAuth 2 flow.
