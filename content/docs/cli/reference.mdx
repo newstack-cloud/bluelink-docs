@@ -80,7 +80,7 @@ The endpoint of the deploy engine api, this is used if `--connect-protocol` is s
 
 **Type**: `string`
 
-**Default Value**: `$HOME/.bluelink/config/engine.auth.json` on Linux or macOS and `%LOCALAPPDATA%\NewStack\Bluelink\config\engine.auth.json` on Windows.
+**Default Value**: `$HOME/.bluelink/clients/engine.auth.json` on Linux or macOS and `%LOCALAPPDATA%\NewStack\Bluelink\clients\engine.auth.json` on Windows.
 
 The path to the authentication configuration file for the deploy engine.
 This is used to authenticate with the deploy engine when using the `stage-changes`, `deploy`, `destroy` and `validate` commands.
@@ -163,7 +163,7 @@ If true, the project will not be initialised as a git repository.
 **Type**: `string`
 
 The directory to initialise the new blueprint project in.
-If not provided, the project will be initialised in the current working directory.
+If not provided, the project will be initialised in a sub-directory based on the project name.
 
 ## `templates`
 
@@ -492,11 +492,35 @@ A local deployment strategy is where the deploy engine is running on the same ma
 
 An example use case would be a CI/CD pipeline that runs the `stage` and `deploy` commands for a blueprint deployment using a local deploy engine installation
 in the container or VM for the job.
-Through the use of these commands, the pipeline can import the deployment state from the previous run of the pipeline and deploy it to the same environment.
+Through the use of these commands, the pipeline can import the deployment state from the previous run of the pipeline and carry out the next deployment to the same environment.
+
+<Callout title="Note" type="info">
+The sync commands can only be used when the deploy engine is running on the same machine as the CLI.
+The configuration for the deploy engine will be used to determine how data should be imported to or exported
+from the configured storage engine.
+</Callout>
+
+### `--engine-config-file`
+
+**Environment Variable**: `BLUELINK_CLI_SYNC_ENGINE_CONFIG_FILE`
+
+**Configuration Key**: `syncEngineConfigFile`
+
+**Type**: `string`
+
+**Default Value**: `$HOME/.bluelink/engine/config.json` on Linux or macOS 
+and `%LOCALAPPDATA%\NewStack\Bluelink\engine\config.json` on Windows.
+
+The path to the deploy engine configuration file that is needed to retrieve the details for the storage engine
+so that import and export operations can be performed.
 
 ### `import`
 
 This command is used to import the entire state or specific blueprint instances from a local file or a remote source.
+
+<Callout title="Caution" type="warning">
+When importing the entire state, the deploy engine will overwrite the existing state with the imported state.
+</Callout>
 
 An example of importing the entire state from a local file:
 ```bash
@@ -512,7 +536,38 @@ bluelink sync import --instances --file s3://bucket-name/path/to/instances-expor
 
 #### `--instances`
 
+**Environment Variable**: `BLUELINK_CLI_SYNC_IMPORT_INSTANCES`
+
+**Configuration Key**: `syncImportInstances`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+A flag to indicate the format of the input file is for importing specific blueprint deployment instances.
+When set, the input file is expected to be a JSON array of blueprint deployment instances.
+
 #### `--file`
+
+**Environment Variable**: `BLUELINK_CLI_SYNC_IMPORT_FILE`
+
+**Configuration Key**: `syncImportFile`
+
+**Type**: `string`
+
+The path to the input file to import.
+When `--instances` is **_not_** set, the input file is expected to be a `*.tar.gz` archive of the entire deploy engine state.
+When `--instances` is set, the input file is expected to be a JSON array of blueprint deployment instances.
+
+This can be a local file or a path to a file in an object storage bucket
+in the format of `{scheme}://{bucket-name}/{object-path}`,
+where `{scheme}` is one of the following: `s3`, `gcs`, `azureblob`.
+The same mechanism that is used for resolving remote blueprint file sources is used.
+
+<Callout title="Remote Storage Credentials" type="warning">
+Credentials for remote object storage buckets are derived from the current environment as per the standard SDK
+mechanisms for each cloud provider.
+</Callout>
 
 ### `export`
 
@@ -530,7 +585,39 @@ bluelink sync export --instances stack-1,stack-2,stack-3 --file s3://bucket-name
 
 #### `--instances`
 
+**Environment Variable**: `BLUELINK_CLI_SYNC_EXPORT_INSTANCES`
+
+**Configuration Key**: `syncExportInstances`
+
+**Type**: `string`
+
+A comma-separated list of blueprint deployment instances to export.
+You can use either the instance name or ID of each blueprint deployment instance
+that you want to export.
+
+When this option is set, the output file will be a JSON file containing an array of blueprint deployment instances.
+
 #### `--file`
+
+**Environment Variable**: `BLUELINK_CLI_SYNC_EXPORT_FILE`
+
+**Configuration Key**: `syncExportFile`
+
+**Type**: `string`
+
+The path to the output file to write the export to.
+
+For clarity, the target file should be a `*.json` file when the `--instances` option is set and a `*.tar.gz` archive for a full state export.
+
+This can be a local file or a path to a location in an object storage bucket
+in the format of `{scheme}://{bucket-name}/{object-path}`,
+where `{scheme}` is one of the following: `s3`, `gcs`, `azureblob`.
+The same mechanism that is used for resolving remote blueprint file locations is used.
+
+<Callout title="Remote Storage Credentials" type="warning">
+Credentials for remote object storage buckets are derived from the current environment as per the standard SDK
+mechanisms for each cloud provider.
+</Callout>
 
 ## `plugins`
 
@@ -550,10 +637,11 @@ This command logs into a plugin registry to allow the installation of plugins fr
 
 An example of logging into a plugin registry:
 ```bash
-bluelink login registry.customhost.com
+bluelink plugins login registry.customhost.com
 ```
 
-The auth configuration for plugin registries is expected to be present in the `$HOME/.bluelink/auth.json` file.
+The auth configuration for plugin registries is expected to be present in the `$HOME/.bluelink/clients/plugins.auth.json` file
+on Linux or macOS and `%LOCALAPPDATA%\NewStack\Bluelink\clients\plugins.auth.json` on Windows.
 See the [Plugin Registry Authentication Protocol](/docs/plugin-framework/registry-protocols-formats/auth-protocol) for more information on how to authenticate with a plugin registry.
 
 ### `list`

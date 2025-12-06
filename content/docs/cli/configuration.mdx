@@ -17,10 +17,10 @@ The order of precedence for configuration is:
 ## Configuration File
 
 The CLI looks for a configuration file in the following locations by default:
-- `$HOME/.bluelink/config/bluelink.config.yml` on Linux or macOS and `%LOCALAPPDATA%\NewStack\Bluelink\config\bluelink.config.yml` on Windows.
-- `$HOME/.bluelink/config/bluelink.config.yaml` on Linux or macOS and `%LOCALAPPDATA%\NewStack\Bluelink\config\bluelink.config.yaml` on Windows.
-- `$HOME/.bluelink/config/bluelink.config.json` on Linux or macOS and `%LOCALAPPDATA%\NewStack\Bluelink\config\bluelink.config.json` on Windows.
-- `$HOME/.bluelink/config/bluelink.config.toml` on Linux or macOS and `%LOCALAPPDATA%\NewStack\Bluelink\config\bluelink.config.toml` on Windows.
+- `$HOME/.bluelink/clients/bluelink.config.yml` on Linux or macOS and `%LOCALAPPDATA%\NewStack\Bluelink\clients\bluelink.config.yml` on Windows.
+- `$HOME/.bluelink/clients/bluelink.config.yaml` on Linux or macOS and `%LOCALAPPDATA%\NewStack\Bluelink\clients\bluelink.config.yaml` on Windows.
+- `$HOME/.bluelink/clients/bluelink.config.json` on Linux or macOS and `%LOCALAPPDATA%\NewStack\Bluelink\clients\bluelink.config.json` on Windows.
+- `$HOME/.bluelink/clients/bluelink.config.toml` on Linux or macOS and `%LOCALAPPDATA%\NewStack\Bluelink\clients\bluelink.config.toml` on Windows.
 
 A custom configuration file can be specified using the `--config` flag.
 You can explore values that can be configured in the [CLI reference](/docs/cli/reference).
@@ -36,5 +36,5 @@ You can explore environment variables that can be configured in the [CLI referen
 Depending on the authentication method configured for the CLI, you will need to provide a separate configuration file
 for authenticating with the Deploy Engine.
 
-By default, the CLI will look for a configuration file at `$HOME/.bluelink/config/engine.auth.json` on Linux or macOS and `%LOCALAPPDATA%\NewStack\Bluelink\config\engine.auth.json` on Windows. 
+By default, the CLI will look for a configuration file at `$HOME/.bluelink/clients/engine.auth.json` on Linux or macOS and `%LOCALAPPDATA%\NewStack\Bluelink\clients\engine.auth.json` on Windows. 
 This can be overridden using the [`--engine-auth-config-file` option](/docs/cli/reference#--engine-auth-config-file).
