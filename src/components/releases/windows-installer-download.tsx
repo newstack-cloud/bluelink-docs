@@ -1,4 +1,4 @@
-import { getWindowsInstaller, formatBytes } from '@/data/releases';
+import { getWindowsInstaller, formatBytes, formatDate } from '@/data/releases';
 import { cn } from '@/lib/cn';
 import { buttonVariants } from '@/components/ui/button';
 import { Download, FileText, ExternalLink } from 'lucide-react';
@@ -58,6 +58,9 @@ export default function WindowsInstallerDownload() {
         </div>
         <p className="mt-3 text-sm text-fd-muted-foreground">
           This installer will set up the Bluelink Manager, configure startup services, and prepare all necessary directories.
+        </p>
+        <p className="mt-2 text-sm text-fd-muted-foreground">
+          Released on {formatDate(installer.publishedAt)}
         </p>
       </div>
     </div>

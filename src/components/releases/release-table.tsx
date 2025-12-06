@@ -3,6 +3,7 @@ import {
   type ComponentRelease,
   COMPONENT_DISPLAY_NAMES,
   formatBytes,
+  formatDate,
   getComponentReleases,
 } from '@/data/releases';
 import { cn } from '@/lib/cn';
@@ -53,6 +54,7 @@ function ReleaseVersion({ release }: { release: ComponentRelease }) {
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-fd-border bg-fd-muted/50 px-4 py-3">
         <div className="flex items-center gap-3">
           <span className="text-lg font-semibold">v{release.version}</span>
+          <span className="text-sm text-fd-muted-foreground">{formatDate(release.publishedAt)}</span>
           <a
             href={release.releaseUrl}
             target="_blank"
@@ -63,7 +65,7 @@ function ReleaseVersion({ release }: { release: ComponentRelease }) {
             <ExternalLink className="h-4 w-4" />
           </a>
         </div>
-        <div className="flex items-center gap-3 text-sm">
+        <div className="flex items-center gap-3 text-sm pr-4">
           {release.checksumsUrl && (
             <a
               href={release.checksumsUrl}
