@@ -1,7 +1,7 @@
 # Bluelink Docs
 
 The website that provides documentation along with a blog for the Bluelink project.
-This contains general documentation for the high-level concepts and components of Bluelink along with versioned documentation for the libraries and applications that make up Celerity.
+This contains general documentation for the high-level concepts and components of Bluelink along with versioned documentation for the libraries and applications that make up Bluelink.
 
 This is a Next.js application generated with
 [Create Fumadocs](https://github.com/fuma-nama/fumadocs).
