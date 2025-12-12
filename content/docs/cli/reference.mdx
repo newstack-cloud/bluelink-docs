@@ -376,6 +376,8 @@ The ID of the change set to deploy.
 This is the result of running the `stage` command for a new or existing blueprint instance.
 The change set ID is optional and the latest change set for a given instance name or ID will be used if not provided.
 
+This flag should not be provided if the `--stage` flag is set.
+
 ### `--instance-name`
 
 **Environment Variable**: `BLUELINK_CLI_DEPLOY_INSTANCE_NAME`
@@ -397,6 +399,39 @@ This should be left empty if the `--instance-id` flag is provided.
 
 The generated ID of the blueprint instance to deploy the change set for.
 This should be left empty if the `--instance-name` flag is provided.
+
+### `--stage`
+
+**Environment Variable**: `BLUELINK_CLI_DEPLOY_STAGE`
+
+**Configuration Key**: `deployStage`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+If true, the deploy command will first stage the changes to produce a change set
+that can be reviewed before deploying.
+In interactive environments, you will be prompted to review the change set before deploying.
+In non-interactive environments such as CI/CD pipelines, you must combine this with the `--auto-approve` flag
+to automatically approve the change set and deploy the blueprint instance.
+
+This flag should not be provided if the `--change-set-id` option is set.
+
+### `--auto-approve`
+
+**Environment Variable**: `BLUELINK_CLI_DEPLOY_AUTO_APPROVE`
+
+**Configuration Key**: `deployAutoApprove`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+If true, the deploy command will automatically approve the change set and deploy the blueprint instance.
+This is primarily used in non-interactive environments such as CI/CD pipelines.
+This is only effective when the `--stage` flag is set, otherwise, either the provided or latest
+change set will be deployed.
 
 ### `--rollback`
 
@@ -447,6 +482,8 @@ The ID of the change set to use to destroy the blueprint instance.
 This is the result of running the `stage` command with the `--destroy` flag for an existing blueprint instance.
 The change set ID is optional and the latest change set for a given instance name or ID will be used if not provided.
 
+This flag should not be provided if the `--stage` flag is set.
+
 ### `--instance-name`
 
 **Environment Variable**: `BLUELINK_CLI_DESTROY_INSTANCE_NAME`
@@ -468,6 +505,39 @@ This should be left empty if the `--instance-id` flag is provided.
 
 The generated ID of the blueprint instance to destroy.
 This should be left empty if the `--instance-name` flag is provided.
+
+### `--stage`
+
+**Environment Variable**: `BLUELINK_CLI_DESTROY_STAGE`
+
+**Configuration Key**: `destroyStage`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+If true, the destroy command will first stage the changes to produce a change set
+that can be reviewed before destroying the blueprint instance.
+In interactive environments, you will be prompted to review the change set before destroying the blueprint instance.
+In non-interactive environments such as CI/CD pipelines, you must combine this with the `--auto-approve` flag
+to automatically approve the change set and destroy the blueprint instance.
+
+This flag should not be provided if the `--change-set-id` option is set.
+
+### `--auto-approve`
+
+**Environment Variable**: `BLUELINK_CLI_DESTROY_AUTO_APPROVE`
+
+**Configuration Key**: `destroyAutoApprove`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+If true, the destroy command will automatically approve the change set and destroy the blueprint instance.
+This is primarily used in non-interactive environments such as CI/CD pipelines.
+
+This is only effective if the `--stage` flag is set.
 
 ### `--rollback`
 
