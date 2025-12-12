@@ -1863,10 +1863,19 @@ components:
     CreateBlueprintInstancePayload:
       type: object
       required:
+        - instanceName
         - changeSetId
         - directory
         - rollback
       properties:
+        instanceName:
+          type: string
+          description: |
+            A unique, user-defined name for the blueprint instance.
+            This name must be unique across all blueprint instances in the system
+            and can be used as an alternative to the instance ID when referencing
+            the blueprint instance in other API calls.
+          example: my-blueprint-instance
         changeSetId:
           type: string
           description: |
