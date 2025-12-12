@@ -37,7 +37,7 @@ This file is expected to be in the JSON with Commas and Comments format describe
 
 If the file is not found, the CLI will send empty configuration to the Deploy Engine, which will in most cases result in an error in the response from the Deploy Engine.
 
-This file is used by the `stage-changes`, `deploy`, `destroy`, `plugins (install|uninstall)` and `validate` commands.
+This file is used by the `stage`, `deploy`, `destroy`, `plugins (install|uninstall)` and `validate` commands.
 
 When the Deploy Engine is running on the same machine as the CLI,
 the commands that use this file will automatically install any
@@ -83,7 +83,7 @@ The endpoint of the deploy engine api, this is used if `--connect-protocol` is s
 **Default Value**: `$HOME/.bluelink/clients/engine.auth.json` on Linux or macOS and `%LOCALAPPDATA%\NewStack\Bluelink\clients\engine.auth.json` on Windows.
 
 The path to the authentication configuration file for the deploy engine.
-This is used to authenticate with the deploy engine when using the `stage-changes`, `deploy`, `destroy` and `validate` commands.
+This is used to authenticate with the deploy engine when using the `stage`, `deploy`, `destroy` and `validate` commands.
 
 See the [Auth Configuration](/docs/cli/auth-configuration) documentation for more information on what is expected to be present in this file.
 
@@ -116,6 +116,8 @@ bluelink init --project-name my-project ./my-project
 **Environment Variable**: `BLUELINK_CLI_INIT_TEMPLATE`
 
 **Configuration Key**: `initTemplate`
+
+**Type**: `string`
 
 **Default Value**: `scaffold`
 
@@ -214,6 +216,8 @@ bluelink validate --blueprint-file s3://bucket-name/path/to/project.blueprint.ya
 
 **Configuration Key**: `validateBlueprintFile`
 
+**Type**: `string`
+
 **Default Value**: `project.blueprint.yaml`
 
 The blueprint file to validate.
@@ -268,7 +272,7 @@ It should be used to generate change sets for updating existing blueprint instan
 This will stream events from the change staging process as they occur.
 
 The change set ID will be rendered in the output of the command once the change staging process has completed,
-this can the be used with the `deploy` command to deploy the change set.
+this can then be used with the `deploy` command to deploy the change set.
 
 Run the command without any flags and go through the interactive prompts to stage changes for a blueprint instance:
 
@@ -318,6 +322,8 @@ This should be left empty if the `--instance-name` flag is provided.
 
 **Configuration Key**: `stageChangesBlueprintFile`
 
+**Type**: `string`
+
 **Default Value**: `project.blueprint.yaml`
 
 The blueprint file to use in the change staging process.
@@ -364,6 +370,12 @@ Deploying a pre-selected instance and change set for a blueprint deployment:
 bluelink deploy --instance-name order-stack --change-set-id a471bbb8-1267-4e65-873b-fa86bca71fcf
 ```
 
+Staging and deploying changes for a blueprint instance in a single command:
+
+```bash
+bluelink deploy --stage --blueprint-file ./project.blueprint.yaml --instance-name order-stack
+```
+
 ### `--change-set-id`
 
 **Environment Variable**: `BLUELINK_CLI_DEPLOY_CHANGE_SET_ID`
@@ -399,6 +411,27 @@ This should be left empty if the `--instance-id` flag is provided.
 
 The generated ID of the blueprint instance to deploy the change set for.
 This should be left empty if the `--instance-name` flag is provided.
+
+### `--blueprint-file`
+
+**Environment Variable**: `BLUELINK_CLI_DEPLOY_BLUEPRINT_FILE`
+
+**Configuration Key**: `deployBlueprintFile`
+
+**Type**: `string`
+
+**Default Value**: `project.blueprint.yaml`
+
+The blueprint file to use for the deployment.
+This can be a local file, a public URL or a path to a file in an object storage bucket.
+Local files can be specified as a relative or absolute path to the file.
+Public URLs must start with `https://` and represent a valid URL to a blueprint file.
+Object storage bucket files must be specified in the format of `{scheme}://{bucket-name}/{object-path}`,
+where `{scheme}` is one of the following: `s3`, `gcs`, `azureblob`.
+
+The blueprint file is required for both staging (when using `--stage`) and deployment execution.
+During deployment, the source blueprint is used to resolve runtime substitutions and orchestrate the deployment process.
+Runtime substitutions are values that can only be resolved at deploy time, such as references to deployed resource attributes (e.g., `${resources.orderFunction.spec.arn}`) or function calls that depend on them.
 
 ### `--stage`
 
@@ -470,6 +503,12 @@ Destroying a pre-selected instance and change set for a blueprint deployment:
 bluelink destroy --instance-name order-stack --change-set-id a471bbb8-1267-4e65-873b-fa86bca71fcf
 ```
 
+Staging and destroying a blueprint instance in a single command:
+
+```bash
+bluelink destroy --stage --blueprint-file ./project.blueprint.yaml --instance-name order-stack
+```
+
 ### `--change-set-id`
 
 **Environment Variable**: `BLUELINK_CLI_DESTROY_CHANGE_SET_ID`
@@ -505,6 +544,25 @@ This should be left empty if the `--instance-id` flag is provided.
 
 The generated ID of the blueprint instance to destroy.
 This should be left empty if the `--instance-name` flag is provided.
+
+### `--blueprint-file`
+
+**Environment Variable**: `BLUELINK_CLI_DESTROY_BLUEPRINT_FILE`
+
+**Configuration Key**: `destroyBlueprintFile`
+
+**Type**: `string`
+
+**Default Value**: `project.blueprint.yaml`
+
+The blueprint file to use in the change staging process when the `--stage` flag is set.
+This can be a local file, a public URL or a path to a file in an object storage bucket.
+Local files can be specified as a relative or absolute path to the file.
+Public URLs must start with `https://` and represent a valid URL to a blueprint file.
+Object storage bucket files must be specified in the format of `{scheme}://{bucket-name}/{object-path}`,
+where `{scheme}` is one of the following: `s3`, `gcs`, `azureblob`.
+
+This flag is only effective when the `--stage` flag is set.
 
 ### `--stage`
 
@@ -714,6 +772,12 @@ The auth configuration for plugin registries is expected to be present in the `$
 on Linux or macOS and `%LOCALAPPDATA%\NewStack\Bluelink\clients\plugins.auth.json` on Windows.
 See the [Plugin Registry Authentication Protocol](/docs/plugin-framework/registry-protocols-formats/auth-protocol) for more information on how to authenticate with a plugin registry.
 
+#### `[registry-host]`
+
+**Type**: `string`
+
+The host of the plugin registry to log into.
+
 ### `list`
 
 Lists all the plugins that are installed on the machine that the CLI is running on.
@@ -722,7 +786,9 @@ Lists all the plugins that are installed on the machine that the CLI is running 
 
 **Environment Variable**: `BLUELINK_CLI_PLUGINS_LIST_TYPE`
 
-**Configuration Key**: `type`
+**Configuration Key**: `pluginsListType`
+
+**Type**: `string`
 
 **Allowed Values**: `provider` | `transformer` | `all`
 
@@ -752,9 +818,17 @@ An example of installing multiple plugins:
 bluelink plugins install newstack-cloud/aws newstack-cloud/azure registry.customhost.com/my-org/gcp
 ```
 
+An example of installing a specific version of a plugin:
+```bash
+bluelink plugins install newstack-cloud/aws@1.5.0
+```
+
 Plugins that exist in the bluelink registry do not need the full URL with the host name,
 only plugins stored in a custom registry need the full URL.
 For example, the plugin ID `bluelink/aws` will be resolved to `registry.bluelink.dev/bluelink/aws`.
+
+You can pin a specific version of a plugin by appending `@{version}` to the plugin ID,
+where `{version}` is a valid semantic version or version constraint.
 
 As plugin IDs are globally unique, the CLI does not differentiate between provider and transformer plugins
 for the sake of installation.
@@ -770,7 +844,6 @@ An example of uninstalling a single plugin:
 ```bash
 bluelink plugins uninstall newstack-cloud/aws
 ```
-
 
 An example of uninstalling multiple plugins:
 ```bash
