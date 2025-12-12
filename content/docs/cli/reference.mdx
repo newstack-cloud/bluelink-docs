@@ -111,6 +111,12 @@ Initialising a new blueprint project in a specific directory:
 bluelink init --project-name my-project ./my-project
 ```
 
+Initialising a new blueprint project without interactive prompts:
+
+```bash
+bluelink init --skip-prompts --project-name my-project --template aws-simple-api
+```
+
 ### `--template`
 
 **Environment Variable**: `BLUELINK_CLI_INIT_TEMPLATE`
@@ -159,6 +165,19 @@ This can be either `yaml` or `jsonc`.
 **Default Value**: `false`
 
 If true, the project will not be initialised as a git repository.
+
+### `--skip-prompts`
+
+**Environment Variable**: `BLUELINK_CLI_INIT_SKIP_PROMPTS`
+
+**Configuration Key**: `initSkipPrompts`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+Skip interactive prompts and use flag values directly.
+Requires all necessary flags to be provided (`--project-name` and `--template`).
 
 ### `[directory]`
 
@@ -376,6 +395,18 @@ Staging and deploying changes for a blueprint instance in a single command:
 bluelink deploy --stage --blueprint-file ./project.blueprint.yaml --instance-name order-stack
 ```
 
+Deploying without interactive prompts using a pre-staged change set:
+
+```bash
+bluelink deploy --skip-prompts --instance-name order-stack --change-set-id a471bbb8-1267-4e65-873b-fa86bca71fcf
+```
+
+Staging and deploying without interactive prompts:
+
+```bash
+bluelink deploy --skip-prompts --stage --auto-approve --blueprint-file ./project.blueprint.yaml --instance-name order-stack
+```
+
 ### `--change-set-id`
 
 **Environment Variable**: `BLUELINK_CLI_DEPLOY_CHANGE_SET_ID`
@@ -446,7 +477,7 @@ Runtime substitutions are values that can only be resolved at deploy time, such 
 If true, the deploy command will first stage the changes to produce a change set
 that can be reviewed before deploying.
 In interactive environments, you will be prompted to review the change set before deploying.
-In non-interactive environments such as CI/CD pipelines, you must combine this with the `--auto-approve` flag
+To skip the change set confirmation, you must combine this with the `--auto-approve` flag
 to automatically approve the change set and deploy the blueprint instance.
 
 This flag should not be provided if the `--change-set-id` option is set.
@@ -462,9 +493,10 @@ This flag should not be provided if the `--change-set-id` option is set.
 **Default Value**: `false`
 
 If true, the deploy command will automatically approve the change set and deploy the blueprint instance.
-This is primarily used in non-interactive environments such as CI/CD pipelines.
 This is only effective when the `--stage` flag is set, otherwise, either the provided or latest
 change set will be deployed.
+
+Note that the CLI automatically detects non-interactive environments, so this flag is typically only needed when running in an interactive terminal where you want to bypass the change set confirmation.
 
 ### `--rollback`
 
@@ -479,6 +511,31 @@ change set will be deployed.
 If true, the deployment will be treated as a rollback operation for a previously deployed or destroyed blueprint instance.
 This can be used to indicate that the deployment is a "restoration" of a previously destroyed instance
 or a rollback to a previous state of a blueprint instance.
+
+### `--skip-prompts`
+
+**Environment Variable**: `BLUELINK_CLI_DEPLOY_SKIP_PROMPTS`
+
+**Configuration Key**: `deploySkipPrompts`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+Skip interactive prompts for user input and use flag values directly.
+Requires all necessary flags to be provided (`--instance-name` or `--instance-id`, and either `--stage` or `--change-set-id`).
+
+<Callout title="Important" type="warning">
+This flag only skips prompts for collecting user input (such as instance name or change set selection).
+It does **not** skip the change set confirmation stage when using `--stage`.
+To skip the change set confirmation, you must also set `--auto-approve`.
+
+These flags are intentionally separate to allow for different automation scenarios:
+- Use `--skip-prompts` alone when you want to provide inputs via flags but still review change sets interactively.
+- Use `--skip-prompts` with `--auto-approve` for fully non-interactive deployments.
+
+Note that the CLI automatically detects non-interactive environments, so these flags are typically only needed when running in an interactive terminal where you want to bypass prompts.
+</Callout>
 
 ## `destroy`
 
@@ -507,6 +564,18 @@ Staging and destroying a blueprint instance in a single command:
 
 ```bash
 bluelink destroy --stage --blueprint-file ./project.blueprint.yaml --instance-name order-stack
+```
+
+Destroying without interactive prompts using a pre-staged change set:
+
+```bash
+bluelink destroy --skip-prompts --instance-name order-stack --change-set-id a471bbb8-1267-4e65-873b-fa86bca71fcf
+```
+
+Staging and destroying without interactive prompts:
+
+```bash
+bluelink destroy --skip-prompts --stage --auto-approve --blueprint-file ./project.blueprint.yaml --instance-name order-stack
 ```
 
 ### `--change-set-id`
@@ -577,7 +646,7 @@ This flag is only effective when the `--stage` flag is set.
 If true, the destroy command will first stage the changes to produce a change set
 that can be reviewed before destroying the blueprint instance.
 In interactive environments, you will be prompted to review the change set before destroying the blueprint instance.
-In non-interactive environments such as CI/CD pipelines, you must combine this with the `--auto-approve` flag
+To skip the change set confirmation, you must combine this with the `--auto-approve` flag
 to automatically approve the change set and destroy the blueprint instance.
 
 This flag should not be provided if the `--change-set-id` option is set.
@@ -593,9 +662,9 @@ This flag should not be provided if the `--change-set-id` option is set.
 **Default Value**: `false`
 
 If true, the destroy command will automatically approve the change set and destroy the blueprint instance.
-This is primarily used in non-interactive environments such as CI/CD pipelines.
-
 This is only effective if the `--stage` flag is set.
+
+Note that the CLI automatically detects non-interactive environments, so this flag is typically only needed when running in an interactive terminal where you want to bypass the change set confirmation.
 
 ### `--rollback`
 
@@ -611,6 +680,31 @@ If true, the destroy action will be treated as a rollback operation for a previo
 This can be used to indicate a rollback to a previous state where the current blueprint instance
 was deployed successfully but another part of the deployment failed, this typically happens when the current blueprint instance
 is a child of another blueprint instance that failed to deploy.
+
+### `--skip-prompts`
+
+**Environment Variable**: `BLUELINK_CLI_DESTROY_SKIP_PROMPTS`
+
+**Configuration Key**: `destroySkipPrompts`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+Skip interactive prompts for user input and use flag values directly.
+Requires all necessary flags to be provided (`--instance-name` or `--instance-id`, and either `--stage` or `--change-set-id`).
+
+<Callout title="Important" type="warning">
+This flag only skips prompts for collecting user input (such as instance name or change set selection).
+It does **not** skip the change set confirmation stage when using `--stage`.
+To skip the change set confirmation, you must also set `--auto-approve`.
+
+These flags are intentionally separate to allow for different automation scenarios:
+- Use `--skip-prompts` alone when you want to provide inputs via flags but still review change sets interactively.
+- Use `--skip-prompts` with `--auto-approve` for fully non-interactive destroy operations.
+
+Note that the CLI automatically detects non-interactive environments, so these flags are typically only needed when running in an interactive terminal where you want to bypass prompts.
+</Callout>
 
 ## `sync`
 
