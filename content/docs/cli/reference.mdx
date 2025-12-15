@@ -498,19 +498,57 @@ change set will be deployed.
 
 Note that the CLI automatically detects non-interactive environments, so this flag is typically only needed when running in an interactive terminal where you want to bypass the change set confirmation.
 
-### `--rollback`
+### `--auto-rollback`
 
-**Environment Variable**: `BLUELINK_CLI_DEPLOY_ROLLBACK`
+**Environment Variable**: `BLUELINK_CLI_DEPLOY_AUTO_ROLLBACK`
 
-**Configuration Key**: `deployRollback`
+**Configuration Key**: `deployAutoRollback`
 
 **Type**: `boolean`
 
 **Default Value**: `false`
 
-If true, the deployment will be treated as a rollback operation for a previously deployed or destroyed blueprint instance.
-This can be used to indicate that the deployment is a "restoration" of a previously destroyed instance
+If true, the deployment will automatically roll back to the previous state if the deployment fails.
+When enabled, the CLI will automatically initiate a rollback operation without requiring manual intervention.
+
+If you prefer to review failures before rolling back, leave this flag disabled and use the `rollback` command manually after inspecting the failure.
+
+### `--as-rollback`
+
+**Environment Variable**: `BLUELINK_CLI_DEPLOY_AS_ROLLBACK`
+
+**Configuration Key**: `deployAsRollback`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+Set this flag to indicate that the current deployment action is intended to be a rollback for a previous action.
+This is used when manually rolling back a previously deployed or destroyed blueprint instance.
+It signals to the deploy engine that this deployment is a "restoration" of a previously destroyed instance
 or a rollback to a previous state of a blueprint instance.
+
+This flag is typically set automatically when using the `rollback` command, but can be set manually
+when using the `deploy` command directly for rollback scenarios.
+
+### `--force`
+
+**Environment Variable**: `BLUELINK_CLI_DEPLOY_FORCE`
+
+**Configuration Key**: `deployForce`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+Force the deployment to proceed, ignoring state conflicts.
+This is an escape hatch for recovering from stuck states where the blueprint instance is in an inconsistent state
+(e.g., stuck in "Deploying" or "Preparing" status due to a crash or unexpected termination).
+
+<Callout title="Caution" type="error">
+Use this flag with care. It bypasses state validation checks that normally prevent concurrent or conflicting operations.
+Only use this when you are certain the instance is in a stuck state and no other deployment process is running.
+</Callout>
 
 ### `--skip-prompts`
 
@@ -666,20 +704,50 @@ This is only effective if the `--stage` flag is set.
 
 Note that the CLI automatically detects non-interactive environments, so this flag is typically only needed when running in an interactive terminal where you want to bypass the change set confirmation.
 
-### `--rollback`
+### `--as-rollback`
 
-**Environment Variable**: `BLUELINK_CLI_DESTROY_ROLLBACK`
+**Environment Variable**: `BLUELINK_CLI_DESTROY_AS_ROLLBACK`
 
-**Configuration Key**: `destroyRollback`
+**Configuration Key**: `destroyAsRollback`
 
 **Type**: `boolean`
 
 **Default Value**: `false`
 
-If true, the destroy action will be treated as a rollback operation for a previously deployed blueprint instance.
-This can be used to indicate a rollback to a previous state where the current blueprint instance
-was deployed successfully but another part of the deployment failed, this typically happens when the current blueprint instance
+Set this flag to indicate that the current destroy action is intended to be a rollback for a previous action.
+This is used when manually rolling back a previously deployed blueprint instance.
+It signals to the deploy engine that this destroy operation is a rollback to a previous state where the current blueprint instance
+was deployed successfully but another part of the deployment failed. This typically happens when the current blueprint instance
 is a child of another blueprint instance that failed to deploy.
+
+This flag is typically set automatically when using the `rollback` command, but can be set manually
+when using the `destroy` command directly for rollback scenarios.
+
+### `--force`
+
+**Environment Variable**: `BLUELINK_CLI_DESTROY_FORCE`
+
+**Configuration Key**: `destroyForce`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+Force the destroy operation to complete, ignoring any failures during the destroy process and removing the blueprint instance record regardless of the outcome.
+This is an escape hatch for removing blueprint instances that are stuck or cannot be destroyed through normal means
+(e.g., when underlying resources were manually deleted outside of the system or when a provider is unavailable).
+
+<Callout title="Danger" type="error">
+**This is a destructive operation that may leave orphaned cloud resources.**
+
+When using `--force`, the destroy process will:
+- Attempt to destroy resources but ignore any failures
+- Remove the blueprint instance record from the deploy engine regardless of whether resources were successfully destroyed
+- Not attempt to clean up any resources that failed to be destroyed
+
+Only use this flag as a last resort when you have verified that the underlying resources have already been removed
+or when you accept the risk of orphaned resources that may incur ongoing costs.
+</Callout>
 
 ### `--skip-prompts`
 
@@ -705,6 +773,137 @@ These flags are intentionally separate to allow for different automation scenari
 
 Note that the CLI automatically detects non-interactive environments, so these flags are typically only needed when running in an interactive terminal where you want to bypass prompts.
 </Callout>
+
+## `inspect`
+
+This command is used to inspect the status of a specific blueprint instance.
+It displays the current state of the instance, including deployment status, resources, and any errors.
+If a deployment or destroy operation is currently in progress, the command will stream real-time updates
+until the operation completes.
+
+Run the command without any flags and go through the interactive prompts to inspect a blueprint instance:
+
+```bash
+bluelink inspect
+```
+
+Inspecting a pre-selected instance by name:
+
+```bash
+bluelink inspect --instance-name order-stack
+```
+
+Inspecting a pre-selected instance by ID:
+
+```bash
+bluelink inspect --instance-id a471bbb8-1267-4e65-873b-fa86bca71fcf
+```
+
+### `--instance-name`
+
+**Environment Variable**: `BLUELINK_CLI_INSPECT_INSTANCE_NAME`
+
+**Configuration Key**: `inspectInstanceName`
+
+**Type**: `string`
+
+The user-defined unique name of the blueprint instance to inspect.
+This should be left empty if the `--instance-id` flag is provided.
+
+### `--instance-id`
+
+**Environment Variable**: `BLUELINK_CLI_INSPECT_INSTANCE_ID`
+
+**Configuration Key**: `inspectInstanceId`
+
+**Type**: `string`
+
+The generated ID of the blueprint instance to inspect.
+This should be left empty if the `--instance-name` flag is provided.
+
+## `rollback`
+
+This command is used to manually roll back a failed deployment or update to a blueprint instance.
+
+Use this command when you have not opted into `--auto-rollback` on the `deploy` command and need to manually
+initiate a rollback after inspecting a deployment failure.
+
+Run the command without any flags and go through the interactive prompts to roll back a blueprint instance:
+
+```bash
+bluelink rollback
+```
+
+Rolling back a pre-selected instance:
+
+```bash
+bluelink rollback --instance-name order-stack
+```
+
+Rolling back with a specific blueprint file:
+
+```bash
+bluelink rollback --instance-name order-stack --blueprint-file ./project.blueprint.yaml
+```
+
+Rolling back without manually approving the rollback change set:
+
+```bash
+bluelink rollback --instance-name order-stack --blueprint-file ./project.blueprint.yaml --auto-approve
+```
+
+### `--instance-name`
+
+**Environment Variable**: `BLUELINK_CLI_ROLLBACK_INSTANCE_NAME`
+
+**Configuration Key**: `rollbackInstanceName`
+
+**Type**: `string`
+
+The user-defined unique name of the blueprint instance to roll back.
+This should be left empty if the `--instance-id` flag is provided.
+
+### `--instance-id`
+
+**Environment Variable**: `BLUELINK_CLI_ROLLBACK_INSTANCE_ID`
+
+**Configuration Key**: `rollbackInstanceId`
+
+**Type**: `string`
+
+The generated ID of the blueprint instance to roll back.
+This should be left empty if the `--instance-name` flag is provided.
+
+### `--blueprint-file`
+
+**Environment Variable**: `BLUELINK_CLI_ROLLBACK_BLUEPRINT_FILE`
+
+**Configuration Key**: `rollbackBlueprintFile`
+
+**Type**: `string`
+
+**Default Value**: `project.blueprint.yaml`
+
+The blueprint file to use for the rollback operation.
+This can be a local file, a public URL or a path to a file in an object storage bucket.
+Local files can be specified as a relative or absolute path to the file.
+Public URLs must start with `https://` and represent a valid URL to a blueprint file.
+Object storage bucket files must be specified in the format of `{scheme}://{bucket-name}/{object-path}`,
+where `{scheme}` is one of the following: `s3`, `gcs`, `azureblob`.
+
+### `--auto-approve`
+
+**Environment Variable**: `BLUELINK_CLI_ROLLBACK_AUTO_APPROVE`
+
+**Configuration Key**: `rollbackAutoApprove`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+If true, the rollback command will automatically approve and execute the rollback without prompting for confirmation.
+
+Note that the CLI automatically detects non-interactive environments, so this flag is typically only needed when running in an interactive terminal where you want to bypass the rollback confirmation.
 
 ## `sync`
 

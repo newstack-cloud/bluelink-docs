@@ -1866,7 +1866,6 @@ components:
         - instanceName
         - changeSetId
         - directory
-        - rollback
       properties:
         instanceName:
           type: string
@@ -1937,11 +1936,31 @@ components:
           default: project.blueprint.yml
         blueprintLocationMetadata:
           $ref: "#/components/schemas/BlueprintLocationMetadata"
-        rollback:
+        asRollback:
           type: boolean
           description: |
-            If true, the creation of the blueprint instance will be treated as a rollback operation
-            for a previously destroyed blueprint instance.
+            Set to true to indicate that the current deployment action is intended to be a rollback for a previous action.
+            This signals to the deploy engine that this deployment is a "restoration" of a previously destroyed instance
+            or a rollback to a previous state of a blueprint instance.
+          example: false
+          default: false
+        autoRollback:
+          type: boolean
+          description: |
+            If true, the deployment will automatically roll back to the previous state if the deployment fails.
+            When enabled, the deploy engine will automatically initiate a rollback operation without requiring
+            manual intervention.
+          example: false
+          default: false
+        force:
+          type: boolean
+          description: |
+            Force the deployment to proceed, ignoring state conflicts.
+            This is an escape hatch for recovering from stuck states where the blueprint instance is in an inconsistent state
+            (e.g., stuck in "Deploying" or "Preparing" status due to a crash or unexpected termination).
+
+            Use this flag with care. It bypasses state validation checks that normally prevent concurrent or conflicting operations.
+            Only use this when you are certain the instance is in a stuck state and no other deployment process is running.
           example: false
           default: false
         config:
@@ -1952,7 +1971,6 @@ components:
       required:
         - changeSetId
         - directory
-        - rollback
       properties:
         changeSetId:
           type: string
@@ -2015,11 +2033,30 @@ components:
           default: project.blueprint.yml
         blueprintLocationMetadata:
           $ref: "#/components/schemas/BlueprintLocationMetadata"
-        rollback:
+        asRollback:
           type: boolean
           description: |
-            If true, the blueprint instance update will be treated as a rollback operation
-            for the previous update to the blueprint instance.
+            Set to true to indicate that the current update action is intended to be a rollback for a previous action.
+            This signals to the deploy engine that this update is a rollback to a previous state of a blueprint instance.
+          example: false
+          default: false
+        autoRollback:
+          type: boolean
+          description: |
+            If true, the update will automatically roll back to the previous state if the update fails.
+            When enabled, the deploy engine will automatically initiate a rollback operation without requiring
+            manual intervention.
+          example: false
+          default: false
+        force:
+          type: boolean
+          description: |
+            Force the update to proceed, ignoring state conflicts.
+            This is an escape hatch for recovering from stuck states where the blueprint instance is in an inconsistent state
+            (e.g., stuck in "Updating" or "Preparing" status due to a crash or unexpected termination).
+
+            Use this flag with care. It bypasses state validation checks that normally prevent concurrent or conflicting operations.
+            Only use this when you are certain the instance is in a stuck state and no other deployment process is running.
           example: false
           default: false
         config:
@@ -2029,7 +2066,6 @@ components:
       type: object
       required:
         - changeSetId
-        - rollback
       properties:
         changeSetId:
           type: string
@@ -2039,13 +2075,32 @@ components:
             of the destroy process re-computing the changes that need to be applied.
 
           example: a471bbb8-1267-4e65-873b-fa86bca71fcf
-        rollback:
+        asRollback:
           type: boolean
           description: |
-            If true, destroying the blueprint instance will be treated as a rollback
-            for the initial deployment of the blueprint instance.
-            This will usually be set to true when rolling back a recent first time deployment
-            that needs to be rolled back due to a failure in a parent blueprint instance.
+            Set to true to indicate that the current destroy action is intended to be a rollback for a previous action.
+            This signals to the deploy engine that this destroy operation is a rollback to a previous state where the
+            blueprint instance was deployed successfully but another part of the deployment failed.
+            This typically happens when the current blueprint instance is a child of another blueprint instance that failed to deploy.
+          example: false
+          default: false
+        force:
+          type: boolean
+          description: |
+            Force the destroy operation to complete, ignoring any failures during the destroy process and removing
+            the blueprint instance record regardless of the outcome.
+            This is an escape hatch for removing blueprint instances that are stuck or cannot be destroyed through normal means
+            (e.g., when underlying resources were manually deleted outside of the system or when a provider is unavailable).
+
+            **Warning: This is a destructive operation that may leave orphaned cloud resources.**
+
+            When using `force`, the destroy process will:
+            - Attempt to destroy resources but ignore any failures
+            - Remove the blueprint instance record from the deploy engine regardless of whether resources were successfully destroyed
+            - Not attempt to clean up any resources that failed to be destroyed
+
+            Only use this flag as a last resort when you have verified that the underlying resources have already been removed
+            or when you accept the risk of orphaned resources that may incur ongoing costs.
           example: false
           default: false
         config:
