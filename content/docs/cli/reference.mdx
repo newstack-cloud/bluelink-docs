@@ -365,6 +365,23 @@ where `{scheme}` is one of the following: `s3`, `gcs`, `azureblob`.
 If true, the change set will be created for a destroy operation.
 This will only be used if the `--instance-id` or `--instance-name` flags are provided.
 
+### `--skip-drift-check`
+
+**Environment Variable**: `BLUELINK_CLI_STAGE_CHANGES_SKIP_DRIFT_CHECK`
+
+**Configuration Key**: `stageChangesSkipDriftCheck`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+If true, drift checks will be skipped during the change staging process.
+Drift checks compare the current state of deployed resources against the expected state
+to detect any out-of-band changes made outside of the deploy engine.
+
+Skipping drift checks can be useful when you are certain no external changes have been made
+or when you want to speed up the staging process for large deployments.
+
 ## `deploy`
 
 This command is used to deploy a change set for a given blueprint instance.
@@ -545,9 +562,10 @@ Force the deployment to proceed, ignoring state conflicts.
 This is an escape hatch for recovering from stuck states where the blueprint instance is in an inconsistent state
 (e.g., stuck in "Deploying" or "Preparing" status due to a crash or unexpected termination).
 
+When used in combination with `--stage`, this flag will also skip drift checks during the change staging process.
+
 <Callout title="Caution" type="error">
-Use this flag with care. It bypasses state validation checks that normally prevent concurrent or conflicting operations.
-Only use this when you are certain the instance is in a stuck state and no other deployment process is running.
+Use this flag with care. Only use this when you are certain the instance is in a stuck state and no other deployment process is running.
 </Callout>
 
 ### `--skip-prompts`

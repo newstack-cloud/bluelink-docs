@@ -1857,6 +1857,17 @@ components:
             If this is not provided, the default value is false.
           example: false
           default: false
+        skipDriftCheck:
+          type: boolean
+          description: |
+            If true, drift checks will be skipped during the change staging process.
+            Drift checks compare the current state of deployed resources against the expected state
+            to detect any out-of-band changes made outside of the deploy engine.
+
+            Skipping drift checks can be useful when you are certain no external changes have been made
+            or when you want to speed up the staging process for large deployments.
+          example: false
+          default: false
         config:
           $ref: "#/components/schemas/Config"
 
@@ -1959,8 +1970,8 @@ components:
             This is an escape hatch for recovering from stuck states where the blueprint instance is in an inconsistent state
             (e.g., stuck in "Deploying" or "Preparing" status due to a crash or unexpected termination).
 
-            Use this flag with care. It bypasses state validation checks that normally prevent concurrent or conflicting operations.
-            Only use this when you are certain the instance is in a stuck state and no other deployment process is running.
+            Use this flag with care. Only use this when you are certain the instance is in a stuck state
+            and no other deployment process is running.
           example: false
           default: false
         config:
@@ -2055,8 +2066,8 @@ components:
             This is an escape hatch for recovering from stuck states where the blueprint instance is in an inconsistent state
             (e.g., stuck in "Updating" or "Preparing" status due to a crash or unexpected termination).
 
-            Use this flag with care. It bypasses state validation checks that normally prevent concurrent or conflicting operations.
-            Only use this when you are certain the instance is in a stuck state and no other deployment process is running.
+            Use this flag with care. Only use this when you are certain the instance is in a stuck state
+            and no other deployment process is running.
           example: false
           default: false
         config:
