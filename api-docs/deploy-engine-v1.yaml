@@ -2425,6 +2425,20 @@ components:
           items:
             type: string
           example: ["resourceA::resourceB"]
+        includeChildren:
+          type: boolean
+          description: |
+            Controls whether to recursively check child blueprints.
+            If not provided, defaults to `true`.
+          example: true
+          default: true
+        childPath:
+          type: string
+          description: |
+            Limits the scope to resources/links within a specific child blueprint path.
+            Used when scope is `specific`.
+            Format: `childA` for first level, `childA.childB` for nested.
+          example: "childA.childB"
         config:
           $ref: "#/components/schemas/Config"
 
@@ -2481,6 +2495,13 @@ components:
           type: string
           description: The unique identifier for the resource.
           example: 60d7c6c5-3984-42b9-a3c1-ae8a47a9bf55
+        childPath:
+          type: string
+          description: |
+            The path to the child blueprint containing this resource.
+            Empty for resources in the parent blueprint.
+            Format: `childA` for first level, `childA.childB` for nested.
+          example: "childA.childB"
         action:
           type: string
           description: |
@@ -2514,6 +2535,13 @@ components:
           type: string
           description: The unique identifier for the link.
           example: 60d7c6c5-3984-42b9-a3c1-ae8a47a9bf55
+        childPath:
+          type: string
+          description: |
+            The path to the child blueprint containing this link.
+            Empty for links in the parent blueprint.
+            Format: `childA` for first level, `childA.childB` for nested.
+          example: "childA"
         action:
           type: string
           description: |
@@ -2579,6 +2607,10 @@ components:
           type: boolean
           description: True if any elements have drifted from expected state.
           example: true
+        hasChildIssues:
+          type: boolean
+          description: True if any child blueprints have drift or interrupted state.
+          example: false
         resources:
           type: array
           description: Reconciliation details for each resource that needs attention.
@@ -2605,6 +2637,13 @@ components:
           type: string
           description: The provider resource type.
           example: aws/s3Bucket
+        childPath:
+          type: string
+          description: |
+            The hierarchical path to the child blueprint containing this resource.
+            Empty string for resources in the parent blueprint.
+            Format: `childA` for first level, `childA.childB` for nested.
+          example: "childA.childB"
         type:
           type: string
           description: |
@@ -2657,6 +2696,13 @@ components:
           type: string
           description: The logical name of the link (format "{resourceA}::{resourceB}").
           example: my-resource-a::my-resource-b
+        childPath:
+          type: string
+          description: |
+            The hierarchical path to the child blueprint containing this link.
+            Empty string for links in the parent blueprint.
+            Format: `childA` for first level, `childA.childB` for nested.
+          example: "childA"
         type:
           type: string
           description: Why this link needs reconciliation.
