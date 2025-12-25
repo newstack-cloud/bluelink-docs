@@ -373,6 +373,13 @@ paths:
 
         Creating a change set should be carried out in preparation for deploying new
         blueprint instances or updating existing blueprint instances.
+
+        Unless `skipDriftCheck` is set to true, drift detection will be performed
+        before staging changes for existing instances. If drift is detected
+        (external state differs from persisted state), a `driftDetected` event
+        will be emitted on the change staging stream and the operation will not
+        proceed with change staging. Use the reconciliation endpoints to resolve
+        drift before retrying.
       operationId: createChangeSet
       parameters:
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
@@ -596,6 +603,47 @@ paths:
         - oauth_jwt: []
         - api_key: []
 
+  /deployments/reconciliation-results/cleanup:
+    post:
+      tags:
+        - Deployments
+      summary: Clean up Reconciliation Results
+      description: |
+        Clean up reconciliation results that are older than the retention period
+        configured for the Deploy Engine instance. Reconciliation results are
+        created when checking for drift or interrupted state in blueprint instances.
+      operationId: cleanUpReconciliationResults
+      parameters:
+        - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+      responses:
+        "202":
+          description: Reconciliation results cleanup has been started.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CleanupStartedResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestError"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorisedError"
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnexpectedError"
+      security:
+        - oauth_jwt: []
+        - api_key: []
+
   /deployments/instances:
     post:
       tags:
@@ -607,6 +655,11 @@ paths:
         document and change set.
         It will return a blueprint instance resource containing an ID that can be used to
         stream deployment events as they occur.
+
+        If the change set was created from an existing instance that has resources
+        in a drifted or interrupted state, the operation will be blocked with a
+        409 Conflict response. Use the reconciliation endpoints to resolve drift
+        before retrying.
       operationId: createBlueprintInstance
       parameters:
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
@@ -637,6 +690,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorisedError"
+        "409":
+          description: |
+            Operation blocked due to drift or interrupted state.
+            Use the reconciliation endpoints to resolve drift before retrying.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DriftBlockedResponse"
         default:
           description: Unexpected error
           content:
@@ -667,6 +728,10 @@ paths:
         document and change set.
         It will return the current state of the blueprint instance, the same ID provided
         should be used to stream deployment events as they occur.
+
+        If the instance has resources in a drifted or interrupted state, the operation
+        will be blocked with a 409 Conflict response. Use the reconciliation endpoints
+        to resolve drift before retrying.
       operationId: updateBlueprintInstance
       requestBody:
         $ref: "#/components/requestBodies/UpdateBlueprintInstanceBody"
@@ -695,6 +760,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorisedError"
+        "409":
+          description: |
+            Operation blocked due to drift or interrupted state.
+            Use the reconciliation endpoints to resolve drift before retrying.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DriftBlockedResponse"
         default:
           description: Unexpected error
           content:
@@ -804,6 +877,11 @@ paths:
         This will start the destroy process for the provided change set.
         It will return the current state of the blueprint instance, the same ID provided
         should be used to stream destroy events as they occur.
+
+        If the instance has resources in a drifted or interrupted state, the operation
+        will be blocked with a 409 Conflict response. Use the reconciliation endpoints
+        to resolve drift before retrying, or set `force` to true in the request body
+        to proceed regardless of drift state.
       operationId: destroyBlueprintInstance
       parameters:
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
@@ -835,6 +913,153 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorisedError"
+        "409":
+          description: |
+            Operation blocked due to drift or interrupted state.
+            Use the reconciliation endpoints to resolve drift before retrying,
+            or use the `force` option to proceed regardless.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DriftBlockedResponse"
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnexpectedError"
+      security:
+        - oauth_jwt: []
+        - api_key: []
+
+  /deployments/instances/{id}/reconciliation/check:
+    post:
+      tags:
+        - Deployments
+      summary: Check Reconciliation Status
+      description: |
+        Checks a blueprint instance for drift (external state differs from persisted state)
+        and interrupted operations. Returns detailed information about which resources
+        and links need reconciliation, along with recommended actions.
+
+        Drift occurs when resources have been modified outside of the Deploy Engine
+        (e.g., manual changes in the cloud provider console). Interrupted state occurs
+        when a previous deployment was cancelled before completing.
+
+        This endpoint does not modify any state - it only performs a read-only check
+        to identify what needs reconciliation.
+      operationId: checkReconciliation
+      parameters:
+        - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - name: id
+          in: path
+          required: true
+          description: The ID or unique name of the blueprint instance to check.
+          schema:
+            type: string
+            example: 16ef8989-af00-4a4a-8164-72493ceb1aa0
+      requestBody:
+        $ref: "#/components/requestBodies/CheckReconciliationBody"
+      responses:
+        "200":
+          description: Reconciliation check completed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReconciliationCheckResult"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestError"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorisedError"
+        "404":
+          description: Instance not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotFoundError"
+        "422":
+          description: Unprocessable entity (input validation failed)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnprocessableEntityError"
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnexpectedError"
+      security:
+        - oauth_jwt: []
+        - api_key: []
+
+  /deployments/instances/{id}/reconciliation/apply:
+    post:
+      tags:
+        - Deployments
+      summary: Apply Reconciliation Actions
+      description: |
+        Applies reconciliation actions to resolve drift or interrupted state for resources
+        and links in a blueprint instance.
+
+        Actions can:
+        - **accept_external**: Accept external cloud state as truth and update persisted state to match
+        - **update_status**: Update the status only without modifying persisted state data
+        - **mark_failed**: Mark the element as failed
+
+        This endpoint should be called after `checkReconciliation` to apply the recommended
+        or user-chosen actions for each element that needs reconciliation.
+      operationId: applyReconciliation
+      parameters:
+        - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - name: id
+          in: path
+          required: true
+          description: The ID or unique name of the blueprint instance to reconcile.
+          schema:
+            type: string
+            example: 16ef8989-af00-4a4a-8164-72493ceb1aa0
+      requestBody:
+        $ref: "#/components/requestBodies/ApplyReconciliationBody"
+      responses:
+        "200":
+          description: Reconciliation actions applied successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplyReconciliationResult"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestError"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorisedError"
+        "404":
+          description: Instance not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotFoundError"
+        "422":
+          description: Unprocessable entity (input validation failed)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnprocessableEntityError"
         default:
           description: Unexpected error
           content:
@@ -1125,7 +1350,32 @@ components:
         - $ref: "#/components/schemas/ChildChangesEvent"
         - $ref: "#/components/schemas/LinkChangesEvent"
         - $ref: "#/components/schemas/ChangeStagingCompleteEvent"
+        - $ref: "#/components/schemas/DriftDetectedEvent"
         - $ref: "#/components/schemas/ErrorEvent"
+
+    DriftDetectedEvent:
+      type: object
+      description: |
+        Event emitted when drift is detected during change staging.
+        This event indicates that external changes have been made to resources
+        outside of the Deploy Engine and the operation has been blocked.
+        The stream will end after this event.
+      required:
+        - message
+        - reconciliationResult
+        - timestamp
+      properties:
+        message:
+          type: string
+          description: A message describing that drift was detected.
+          example: Drift detected. External changes to resources require reconciliation.
+        reconciliationResult:
+          $ref: "#/components/schemas/ReconciliationCheckResult"
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix timestamp when drift was detected.
+          example: 1678901234
 
     ResourceChangesEvent:
       type: object
@@ -2117,6 +2367,427 @@ components:
         config:
           $ref: "#/components/schemas/Config"
 
+    CheckReconciliationPayload:
+      type: object
+      required:
+        - config
+      properties:
+        fileSourceScheme:
+          type: string
+          description: |
+            The file source scheme to determine where the blueprint document is located.
+          example: file
+          default: file
+          enum:
+            - file
+            - s3
+            - gcs
+            - azureblob
+            - https
+        directory:
+          type: string
+          description: |
+            The directory where the blueprint document is located.
+          example: /path/to/blueprint-directory
+        blueprintFile:
+          type: string
+          description: The name of the blueprint file.
+          example: project.blueprint.yml
+          default: project.blueprint.yml
+        blueprintLocationMetadata:
+          $ref: "#/components/schemas/BlueprintLocationMetadata"
+        scope:
+          type: string
+          description: |
+            Controls which elements to check for reconciliation.
+            - `all`: Check all resources and links in the instance (default)
+            - `interrupted`: Only check elements currently in an interrupted state
+            - `specific`: Check only the named resources and/or links
+          example: all
+          default: all
+          enum:
+            - all
+            - interrupted
+            - specific
+        resourceNames:
+          type: array
+          description: |
+            Resource names to check when scope is `specific`.
+            Ignored for other scopes.
+          items:
+            type: string
+          example: ["my-resource-1", "my-resource-2"]
+        linkNames:
+          type: array
+          description: |
+            Link names to check when scope is `specific`.
+            Ignored for other scopes.
+          items:
+            type: string
+          example: ["resourceA::resourceB"]
+        config:
+          $ref: "#/components/schemas/Config"
+
+    ApplyReconciliationPayload:
+      type: object
+      required:
+        - config
+      properties:
+        fileSourceScheme:
+          type: string
+          description: |
+            The file source scheme to determine where the blueprint document is located.
+          example: file
+          default: file
+          enum:
+            - file
+            - s3
+            - gcs
+            - azureblob
+            - https
+        directory:
+          type: string
+          description: |
+            The directory where the blueprint document is located.
+          example: /path/to/blueprint-directory
+        blueprintFile:
+          type: string
+          description: The name of the blueprint file.
+          example: project.blueprint.yml
+          default: project.blueprint.yml
+        blueprintLocationMetadata:
+          $ref: "#/components/schemas/BlueprintLocationMetadata"
+        resourceActions:
+          type: array
+          description: Actions to apply to resources that need reconciliation.
+          items:
+            $ref: "#/components/schemas/ResourceReconcileActionPayload"
+        linkActions:
+          type: array
+          description: Actions to apply to links that need reconciliation.
+          items:
+            $ref: "#/components/schemas/LinkReconcileActionPayload"
+        config:
+          $ref: "#/components/schemas/Config"
+
+    ResourceReconcileActionPayload:
+      type: object
+      required:
+        - resourceId
+        - action
+        - newStatus
+      properties:
+        resourceId:
+          type: string
+          description: The unique identifier for the resource.
+          example: 60d7c6c5-3984-42b9-a3c1-ae8a47a9bf55
+        action:
+          type: string
+          description: |
+            The reconciliation action to apply.
+            - `accept_external`: Accept external cloud state as truth and update persisted state
+            - `update_status`: Update status only without modifying persisted state data
+            - `mark_failed`: Mark the element as failed
+          example: accept_external
+          enum:
+            - accept_external
+            - update_status
+            - mark_failed
+        externalState:
+          type: object
+          description: |
+            Required when action is `accept_external`.
+            The external state that will be persisted.
+        newStatus:
+          type: string
+          description: The precise resource status to set.
+          example: CREATED
+
+    LinkReconcileActionPayload:
+      type: object
+      required:
+        - linkId
+        - action
+        - newStatus
+      properties:
+        linkId:
+          type: string
+          description: The unique identifier for the link.
+          example: 60d7c6c5-3984-42b9-a3c1-ae8a47a9bf55
+        action:
+          type: string
+          description: |
+            The reconciliation action to apply.
+            - `accept_external`: Accept external cloud state as truth and update persisted state
+            - `update_status`: Update status only without modifying persisted state data
+            - `mark_failed`: Mark the element as failed
+          example: update_status
+          enum:
+            - accept_external
+            - update_status
+            - mark_failed
+        newStatus:
+          type: string
+          description: The precise link status to set.
+          example: RESOURCE_B_UPDATED
+        linkDataUpdates:
+          type: object
+          description: |
+            Updates to apply to link.Data when action is `accept_external`.
+            Key is the linkDataPath (e.g., "resourceA.handler"), value is the external value.
+          additionalProperties: true
+        intermediaryActions:
+          type: object
+          description: Actions for intermediary resources owned by this link.
+          additionalProperties:
+            $ref: "#/components/schemas/IntermediaryReconcileActionPayload"
+
+    IntermediaryReconcileActionPayload:
+      type: object
+      required:
+        - action
+        - newStatus
+      properties:
+        action:
+          type: string
+          description: The reconciliation action to apply.
+          enum:
+            - accept_external
+            - update_status
+            - mark_failed
+        externalState:
+          type: object
+          description: |
+            Required when action is `accept_external`.
+            The external state that will be persisted.
+        newStatus:
+          type: string
+          description: The precise resource status to set.
+
+    ReconciliationCheckResult:
+      type: object
+      properties:
+        instanceId:
+          type: string
+          description: The ID of the blueprint instance that was checked.
+          example: 60d7c6c5-3984-42b9-a3c1-ae8a47a9bf55
+        hasInterrupted:
+          type: boolean
+          description: True if any elements are in an interrupted state.
+          example: false
+        hasDrift:
+          type: boolean
+          description: True if any elements have drifted from expected state.
+          example: true
+        resources:
+          type: array
+          description: Reconciliation details for each resource that needs attention.
+          items:
+            $ref: "#/components/schemas/ResourceReconcileResult"
+        links:
+          type: array
+          description: Reconciliation details for each link that needs attention.
+          items:
+            $ref: "#/components/schemas/LinkReconcileResult"
+
+    ResourceReconcileResult:
+      type: object
+      properties:
+        resourceId:
+          type: string
+          description: The unique identifier for the resource.
+          example: 60d7c6c5-3984-42b9-a3c1-ae8a47a9bf55
+        resourceName:
+          type: string
+          description: The logical name of the resource in the blueprint.
+          example: my-resource
+        resourceType:
+          type: string
+          description: The provider resource type.
+          example: aws/s3Bucket
+        type:
+          type: string
+          description: |
+            Why this resource needs reconciliation.
+            - `interrupted`: Element was left in an interrupted state after deployment cancellation
+            - `drift`: External cloud state differs from persisted state
+            - `state_refresh`: Manual state refresh was requested
+          enum:
+            - interrupted
+            - drift
+            - state_refresh
+        oldStatus:
+          type: integer
+          description: The precise resource status before reconciliation check.
+          example: 3
+        newStatus:
+          type: integer
+          description: The precise resource status determined from fetching external state.
+          example: 3
+        externalState:
+          type: object
+          description: The current cloud state if the resource exists. Null if resource doesn't exist.
+          nullable: true
+        persistedState:
+          type: object
+          description: What we have in our state store.
+          nullable: true
+        changes:
+          $ref: "#/components/schemas/FieldChanges"
+        resourceExists:
+          type: boolean
+          description: Whether the resource was found in the cloud.
+          example: true
+        recommendedAction:
+          type: string
+          description: The suggested action based on the reconciliation analysis.
+          enum:
+            - accept_external
+            - update_status
+            - mark_failed
+
+    LinkReconcileResult:
+      type: object
+      properties:
+        linkId:
+          type: string
+          description: The unique identifier for the link.
+          example: 60d7c6c5-3984-42b9-a3c1-ae8a47a9bf55
+        linkName:
+          type: string
+          description: The logical name of the link (format "{resourceA}::{resourceB}").
+          example: my-resource-a::my-resource-b
+        type:
+          type: string
+          description: Why this link needs reconciliation.
+          enum:
+            - interrupted
+            - drift
+            - state_refresh
+        oldStatus:
+          type: integer
+          description: The precise link status before reconciliation check.
+          example: 7
+        newStatus:
+          type: integer
+          description: The precise link status determined from analyzing connected resources.
+          example: 7
+        resourceAChanges:
+          $ref: "#/components/schemas/FieldChanges"
+        resourceBChanges:
+          $ref: "#/components/schemas/FieldChanges"
+        intermediaryChanges:
+          type: object
+          description: Reconciliation details for intermediary resources owned by this link.
+          additionalProperties:
+            $ref: "#/components/schemas/IntermediaryReconcileResult"
+        linkDataUpdates:
+          type: object
+          description: |
+            Pre-computed updates to apply to link.Data when accepting external state.
+            Key is the linkDataPath (e.g., "resourceA.handler"), value is the external value.
+          additionalProperties: true
+        recommendedAction:
+          type: string
+          description: The suggested action based on the reconciliation analysis.
+          enum:
+            - accept_external
+            - update_status
+            - mark_failed
+
+    IntermediaryReconcileResult:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The name of the intermediary resource.
+          example: my-intermediary
+        type:
+          type: string
+          description: The type of the intermediary resource.
+          example: aws/securityGroup
+        externalState:
+          type: object
+          description: The current cloud state if the resource exists.
+          nullable: true
+        persistedState:
+          type: object
+          description: What we have in our state store.
+          nullable: true
+        changes:
+          $ref: "#/components/schemas/FieldChanges"
+        exists:
+          type: boolean
+          description: Whether the intermediary resource was found in the cloud.
+          example: true
+
+    ApplyReconciliationResult:
+      type: object
+      properties:
+        instanceId:
+          type: string
+          description: The ID of the blueprint instance that was reconciled.
+          example: 60d7c6c5-3984-42b9-a3c1-ae8a47a9bf55
+        resourcesUpdated:
+          type: integer
+          description: The number of resources that were successfully updated.
+          example: 2
+        linksUpdated:
+          type: integer
+          description: The number of links that were successfully updated.
+          example: 1
+        errors:
+          type: array
+          description: Any errors that occurred during reconciliation.
+          items:
+            $ref: "#/components/schemas/ReconciliationError"
+
+    ReconciliationError:
+      type: object
+      properties:
+        elementId:
+          type: string
+          description: The unique identifier for the element that failed.
+          example: 60d7c6c5-3984-42b9-a3c1-ae8a47a9bf55
+        elementName:
+          type: string
+          description: The logical name of the element.
+          example: my-resource
+        elementType:
+          type: string
+          description: Whether this is a resource or link.
+          enum:
+            - resource
+            - link
+        error:
+          type: string
+          description: The error message.
+          example: failed to update state - permission denied
+
+    DriftBlockedResponse:
+      type: object
+      description: Response when an operation is blocked due to drift or interrupted state.
+      properties:
+        message:
+          type: string
+          description: A message describing why the operation was blocked.
+          example: Operation blocked due to drift detected in deployed resources.
+        instanceId:
+          type: string
+          description: The ID of the blueprint instance.
+          example: 60d7c6c5-3984-42b9-a3c1-ae8a47a9bf55
+        changesetId:
+          type: string
+          description: The ID of the changeset if applicable.
+          nullable: true
+          example: a471bbb8-1267-4e65-873b-fa86bca71fcf
+        reconciliationResult:
+          $ref: "#/components/schemas/ReconciliationCheckResult"
+        hint:
+          type: string
+          description: Suggested next steps to resolve the blocked state.
+          example: Use the reconciliation endpoints to resolve drift before retrying.
+
     ChangeSet:
       type: object
       required:
@@ -2311,6 +2982,28 @@ components:
             type: string
             description: The name of the field that will be removed.
             example: my-old-field
+
+    FieldChanges:
+      type: object
+      description: |
+        Details of field-level changes between persisted and external state.
+        Used in reconciliation results to show what has changed.
+      properties:
+        modifiedFields:
+          type: array
+          description: Fields that have changed between persisted and external state.
+          items:
+            $ref: "#/components/schemas/FieldChange"
+        newFields:
+          type: array
+          description: Fields that exist in external state but not in persisted state.
+          items:
+            $ref: "#/components/schemas/FieldChange"
+        removedFields:
+          type: array
+          description: Field paths that exist in persisted state but not in external state.
+          items:
+            type: string
 
     FieldChange:
       type: object
@@ -3682,6 +4375,22 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/DestroyBlueprintInstancePayload"
+
+    CheckReconciliationBody:
+      description: Payload for checking reconciliation status of a blueprint instance.
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/CheckReconciliationPayload"
+
+    ApplyReconciliationBody:
+      description: Payload for applying reconciliation actions to a blueprint instance.
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApplyReconciliationPayload"
 
   examples:
     changeSetChangesExample:

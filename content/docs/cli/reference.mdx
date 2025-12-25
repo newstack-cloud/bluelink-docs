@@ -923,27 +923,27 @@ If true, the rollback command will automatically approve and execute the rollbac
 
 Note that the CLI automatically detects non-interactive environments, so this flag is typically only needed when running in an interactive terminal where you want to bypass the rollback confirmation.
 
-## `sync`
+## `state`
 
-This is the command category for syncing deployment state between different environments.
-These commands are useful for sharing deployment state between different environments when adopting a local deployment strategy.
+This is the command category for managing deploy engine state between different environments.
+These commands are useful for sharing deploy engine state between different environments when adopting a local deployment strategy.
 A local deployment strategy is where the deploy engine is running on the same machine as the CLI when running commands such as `deploy` or `destroy`.
 
 An example use case would be a CI/CD pipeline that runs the `stage` and `deploy` commands for a blueprint deployment using a local deploy engine installation
 in the container or VM for the job.
-Through the use of these commands, the pipeline can import the deployment state from the previous run of the pipeline and carry out the next deployment to the same environment.
+Through the use of these commands, the pipeline can import the deploy engine state from the previous run of the pipeline and carry out the next deployment to the same environment.
 
 <Callout title="Note" type="info">
-The sync commands can only be used when the deploy engine is running on the same machine as the CLI.
+The state commands can only be used when the deploy engine is running on the same machine as the CLI.
 The configuration for the deploy engine will be used to determine how data should be imported to or exported
 from the configured storage engine.
 </Callout>
 
 ### `--engine-config-file`
 
-**Environment Variable**: `BLUELINK_CLI_SYNC_ENGINE_CONFIG_FILE`
+**Environment Variable**: `BLUELINK_CLI_STATE_ENGINE_CONFIG_FILE`
 
-**Configuration Key**: `syncEngineConfigFile`
+**Configuration Key**: `stateEngineConfigFile`
 
 **Type**: `string`
 
@@ -963,21 +963,21 @@ When importing the entire state, the deploy engine will overwrite the existing s
 
 An example of importing the entire state from a local file:
 ```bash
-bluelink sync import --file ./deployment-state.tar.gz
+bluelink state import --file ./deployment-state.tar.gz
 ```
 
 An example of importing one or more specific blueprint deployment instances from a remote source:
 ```bash
 # The input file should be in the JSON format exported
 # by the `export` command with the `--instances [idOrName1,idOrName2,...]` flag.
-bluelink sync import --instances --file s3://bucket-name/path/to/instances-export.json
+bluelink state import --instances --file s3://bucket-name/path/to/instances-export.json
 ```
 
 #### `--instances`
 
-**Environment Variable**: `BLUELINK_CLI_SYNC_IMPORT_INSTANCES`
+**Environment Variable**: `BLUELINK_CLI_STATE_IMPORT_INSTANCES`
 
-**Configuration Key**: `syncImportInstances`
+**Configuration Key**: `stateImportInstances`
 
 **Type**: `boolean`
 
@@ -988,9 +988,9 @@ When set, the input file is expected to be a JSON array of blueprint deployment 
 
 #### `--file`
 
-**Environment Variable**: `BLUELINK_CLI_SYNC_IMPORT_FILE`
+**Environment Variable**: `BLUELINK_CLI_STATE_IMPORT_FILE`
 
-**Configuration Key**: `syncImportFile`
+**Configuration Key**: `stateImportFile`
 
 **Type**: `string`
 
@@ -1014,19 +1014,19 @@ This command is used to export the entire state or specific blueprint instances 
 
 An example of exporting the entire state to a local file:
 ```bash
-bluelink sync export --file ./deployment-state.tar.gz
+bluelink state export --file ./deployment-state.tar.gz
 ```
 
 An example of exporting one or more specific blueprint deployment instances to a remote source:
 ```bash
-bluelink sync export --instances stack-1,stack-2,stack-3 --file s3://bucket-name/path/to/instances-export.json
+bluelink state export --instances stack-1,stack-2,stack-3 --file s3://bucket-name/path/to/instances-export.json
 ```
 
 #### `--instances`
 
-**Environment Variable**: `BLUELINK_CLI_SYNC_EXPORT_INSTANCES`
+**Environment Variable**: `BLUELINK_CLI_STATE_EXPORT_INSTANCES`
 
-**Configuration Key**: `syncExportInstances`
+**Configuration Key**: `stateExportInstances`
 
 **Type**: `string`
 
@@ -1038,9 +1038,9 @@ When this option is set, the output file will be a JSON file containing an array
 
 #### `--file`
 
-**Environment Variable**: `BLUELINK_CLI_SYNC_EXPORT_FILE`
+**Environment Variable**: `BLUELINK_CLI_STATE_EXPORT_FILE`
 
-**Configuration Key**: `syncExportFile`
+**Configuration Key**: `stateExportFile`
 
 **Type**: `string`
 
