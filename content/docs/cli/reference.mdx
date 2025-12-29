@@ -382,6 +382,24 @@ to detect any out-of-band changes made outside of the deploy engine.
 Skipping drift checks can be useful when you are certain no external changes have been made
 or when you want to speed up the staging process for large deployments.
 
+### `--json`
+
+**Environment Variable**: `BLUELINK_CLI_STAGE_JSON`
+
+**Configuration Key**: `stageJson`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+Output the result as a single JSON object when the operation completes.
+This is useful for CI/CD pipelines and programmatic tooling consumption.
+
+When enabled, JSON mode implies non-interactive mode (no TUI, no streaming text output).
+The output includes the change set ID, instance information, the full set of changes, and a summary of the changes.
+
+If drift is detected during staging, the JSON output will include drift information and reconciliation details.
+
 ## `deploy`
 
 This command is used to deploy a change set for a given blueprint instance.
@@ -593,6 +611,23 @@ These flags are intentionally separate to allow for different automation scenari
 Note that the CLI automatically detects non-interactive environments, so these flags are typically only needed when running in an interactive terminal where you want to bypass prompts.
 </Callout>
 
+### `--json`
+
+**Environment Variable**: `BLUELINK_CLI_DEPLOY_JSON`
+
+**Configuration Key**: `deployJson`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+Output the result as a single JSON object when the operation completes.
+This is useful for CI/CD pipelines and programmatic tooling consumption.
+
+When enabled, JSON mode implies non-interactive mode (no TUI, no streaming text output).
+The output includes the full blueprint instance state with resource IDs, exports, child blueprints, and deployment status.
+On failure, the output includes failure reasons and rollback status if applicable.
+
 ## `destroy`
 
 This command is used to destroy a blueprint instance.
@@ -792,7 +827,86 @@ These flags are intentionally separate to allow for different automation scenari
 Note that the CLI automatically detects non-interactive environments, so these flags are typically only needed when running in an interactive terminal where you want to bypass prompts.
 </Callout>
 
-## `inspect`
+### `--json`
+
+**Environment Variable**: `BLUELINK_CLI_DESTROY_JSON`
+
+**Configuration Key**: `destroyJson`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+Output the result as a single JSON object when the operation completes.
+This is useful for CI/CD pipelines and programmatic tooling consumption.
+
+When enabled, JSON mode implies non-interactive mode (no TUI, no streaming text output).
+The output includes the destroy operation status and summary details.
+On failure, the output includes failure reasons.
+
+## `instances`
+
+This is the command category for managing and viewing blueprint instances.
+
+### `list`
+
+`bluelink instances list [options]`
+
+This command lists blueprint instances managed by the deploy engine.
+By default, all instances are listed. In interactive mode, the list is paginated
+and you can use the search functionality to filter instances.
+
+List all instances:
+
+```bash
+bluelink instances list
+```
+
+Filter instances by name:
+
+```bash
+bluelink instances list --search "order"
+```
+
+Output results as JSON for programmatic use:
+
+```bash
+bluelink instances list --json
+```
+
+#### `--search`
+
+**Environment Variable**: `BLUELINK_CLI_INSTANCES_LIST_SEARCH`
+
+**Configuration Key**: `instancesListSearch`
+
+**Type**: `string`
+
+A search term to filter instances by name. The search is case-insensitive and matches
+instances whose names contain the search term.
+
+In interactive mode, you can also use the built-in search functionality to filter
+the paginated list of instances.
+
+#### `--json`
+
+**Environment Variable**: `BLUELINK_CLI_INSTANCES_LIST_JSON`
+
+**Configuration Key**: `instancesListJson`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+Output the results as a JSON array.
+This is useful for CI/CD pipelines and programmatic tooling consumption.
+
+When enabled, JSON mode implies non-interactive mode.
+The output includes instance IDs, names, status, and last deployment timestamps.
+
+### `inspect`
+
+`bluelink instances inspect [options]`
 
 This command is used to inspect the status of a specific blueprint instance.
 It displays the current state of the instance, including deployment status, resources, and any errors.
@@ -802,37 +916,37 @@ until the operation completes.
 Run the command without any flags and go through the interactive prompts to inspect a blueprint instance:
 
 ```bash
-bluelink inspect
+bluelink instances inspect
 ```
 
 Inspecting a pre-selected instance by name:
 
 ```bash
-bluelink inspect --instance-name order-stack
+bluelink instances inspect --instance-name order-stack
 ```
 
 Inspecting a pre-selected instance by ID:
 
 ```bash
-bluelink inspect --instance-id a471bbb8-1267-4e65-873b-fa86bca71fcf
+bluelink instances inspect --instance-id a471bbb8-1267-4e65-873b-fa86bca71fcf
 ```
 
-### `--instance-name`
+#### `--instance-name`
 
-**Environment Variable**: `BLUELINK_CLI_INSPECT_INSTANCE_NAME`
+**Environment Variable**: `BLUELINK_CLI_INSTANCES_INSPECT_INSTANCE_NAME`
 
-**Configuration Key**: `inspectInstanceName`
+**Configuration Key**: `instancesInspectInstanceName`
 
 **Type**: `string`
 
 The user-defined unique name of the blueprint instance to inspect.
 This should be left empty if the `--instance-id` flag is provided.
 
-### `--instance-id`
+#### `--instance-id`
 
-**Environment Variable**: `BLUELINK_CLI_INSPECT_INSTANCE_ID`
+**Environment Variable**: `BLUELINK_CLI_INSTANCES_INSPECT_INSTANCE_ID`
 
-**Configuration Key**: `inspectInstanceId`
+**Configuration Key**: `instancesInspectInstanceId`
 
 **Type**: `string`
 

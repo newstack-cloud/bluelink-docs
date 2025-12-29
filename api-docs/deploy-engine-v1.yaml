@@ -533,6 +533,7 @@ paths:
                       - childChanges
                       - linkChanges
                       - changeStagingComplete
+                      - driftDetected
                       - error
                   id:
                     type: string
@@ -1586,7 +1587,7 @@ components:
             The high-level status of the resource.
             See the `ResourceState` schema definition for more information on what each status means.
           example: 2
-          enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+          enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
         preciseStatus:
           type: integer
           description: |
@@ -1618,6 +1619,9 @@ components:
               20,
               21,
               22,
+              23,
+              24,
+              25,
             ]
         failureReasons:
           type: array
@@ -1723,6 +1727,9 @@ components:
               17,
               18,
               19,
+              20,
+              21,
+              22,
             ]
         failureReasons:
           type: array
@@ -1786,7 +1793,7 @@ components:
             See the `LinkState` schema definition for more information on what each status means.
           example: 2
           enum:
-            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
         preciseStatus:
           type: integer
           description: |
@@ -1794,7 +1801,7 @@ components:
             See the `LinkState` schema definition for more information on what each status means.
           example: 3
           enum:
-            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
         failureReasons:
           type: array
           description: |
@@ -2861,13 +2868,22 @@ components:
           example: false
         status:
           type: string
-          description: The status of the change set.
+          description: |
+            The status of the change set.
+
+            The following status values are supported:
+            - `STARTING`: The change staging process is starting.
+            - `STAGING_CHANGES`: The change staging process is running.
+            - `CHANGES_STAGED`: The change staging process has completed successfully.
+            - `FAILED`: The change staging process has failed.
+            - `DRIFT_DETECTED`: Drift or interrupted state was detected during change staging and the process was blocked. Use the reconciliation endpoints to resolve drift before retrying.
           example: STAGING_CHANGES
           enum:
             - STARTING
             - STAGING_CHANGES
             - CHANGES_STAGED
             - FAILED
+            - DRIFT_DETECTED
         blueprintLocation:
           type: string
           description: |
@@ -3332,8 +3348,11 @@ components:
             - Rolling Back (10) - The status used when another change in the same blueprint has failed and the latest change involving the current resource is being rolled back.
             - Rollback Failed (11) - The status used when another change in the same blueprint has failed and the latest change involving the current resource could not be rolled back.
             - Rollback Complete (12) - The status used when another change in the same blueprint has failed and the latest change involving the current resource has been rolled back.
+            - Create Interrupted (13) - The status used when a resource creation was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state of the resource is unknown and needs reconciliation.
+            - Update Interrupted (14) - The status used when a resource update was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state of the resource is unknown and needs reconciliation.
+            - Destroy Interrupted (15) - The status used when a resource destruction was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state of the resource is unknown and needs reconciliation.
           example: 2
-          enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+          enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
         preciseStatus:
           type: integer
           description: |
@@ -3364,6 +3383,9 @@ components:
             - Update Rollback Failed (20) - The precise status used when another change in the same blueprint has failed and the current resource that was successfully updated could not be rolled back.
             - Update Rollback Config Complete (21) - The precise status used when another change in the same blueprint has failed and the current resource that was successfully updated has been rolled back but is not yet in a stable state.
             - Update Rollback Complete (22) - The precise status used when another change in the same blueprint has failed and the current resource that was successfully updated has been rolled back and is in a stable state.
+            - Create Interrupted (23) - The precise status used when a resource creation was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state of the resource is unknown and needs reconciliation.
+            - Update Interrupted (24) - The precise status used when a resource update was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state of the resource is unknown and needs reconciliation.
+            - Destroy Interrupted (25) - The precise status used when a resource destruction was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state of the resource is unknown and needs reconciliation.
           example: 3
           enum:
             [
@@ -3390,6 +3412,9 @@ components:
               20,
               21,
               22,
+              23,
+              24,
+              25,
             ]
         lastStatusUpdateTimestamp:
           type: integer
@@ -3675,6 +3700,9 @@ components:
             - Update Rollback Failed (17) - The status used when a blueprint instance update has failed and the rollback to a previous state has failed.
             - Update Rollback Complete (18) - The status used when a blueprint instance update has failed and the rollback to a previous state has completed successfully.
             - Not Deployed (19) - The status used when a blueprint instance has not had its first deployment. This is useful for persisting a skeleton for an instance before the first deployment of a new blueprint instance.
+            - Deploy Interrupted (20) - The status used when a blueprint instance deployment was interrupted due to being cancelled (e.g., drain timeout after terminal failure). The actual state of the instance is unknown and needs reconciliation.
+            - Update Interrupted (21) - The status used when a blueprint instance update was interrupted due to being cancelled (e.g., drain timeout after terminal failure). The actual state of the instance is unknown and needs reconciliation.
+            - Destroy Interrupted (22) - The status used when a blueprint instance destruction was interrupted due to being cancelled (e.g., drain timeout after terminal failure). The actual state of the instance is unknown and needs reconciliation.
           example: 2
           enum:
             [
@@ -3698,6 +3726,9 @@ components:
               17,
               18,
               19,
+              20,
+              21,
+              22,
             ]
         lastStatusUpdateTimestamp:
           type: integer
@@ -3979,9 +4010,12 @@ components:
             - Update Rolling Back (16) - The status used when another change in the same blueprint has failed and the current link that was successfully updated is being rolled back.
             - Update Rollback Failed (17) - The status used when another change in the same blueprint has failed and the current link that was successfully updated could not be rolled back.
             - Update Rollback Complete (18) - The status used when another change in the same blueprint has failed and the current link that was successfully updated has been rolled back.
+            - Create Interrupted (19) - The status used when a link creation was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state of the link is unknown and needs reconciliation.
+            - Update Interrupted (20) - The status used when a link update was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state of the link is unknown and needs reconciliation.
+            - Destroy Interrupted (21) - The status used when a link destruction was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state of the link is unknown and needs reconciliation.
           example: 2
           enum:
-            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
         preciseStatus:
           type: integer
           description: |
@@ -4007,10 +4041,13 @@ components:
             - Intermediary Resource Update Failed (15) - The precise status used when an intermediary resource has failed to be updated, created or destroyed.
             - Intermediary Resource Update Rolling Back (16) - The precise status used when another change in the same blueprint has failed and the current link for which intermediary resources were successfully updated is being rolled back.
             - Intermediary Resource Update Rollback Failed (17) - The precise status used when another change in the same blueprint has failed and the current link for which intermediary resources were successfully updated failed to be rolled back.
-            - Intermediary Resource UpdateRollback Complete (18) - The precise status used when another change in the same blueprint has failed and the current link for which intermediary resources were succesfully updated has been rolled back.
+            - Intermediary Resource Update Rollback Complete (18) - The precise status used when another change in the same blueprint has failed and the current link for which intermediary resources were succesfully updated has been rolled back.
+            - Resource A Update Interrupted (19) - The precise status used when the resource A update for a link was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state is unknown and needs reconciliation.
+            - Resource B Update Interrupted (20) - The precise status used when the resource B update for a link was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state is unknown and needs reconciliation.
+            - Intermediary Resources Update Interrupted (21) - The precise status used when the intermediary resources update for a link was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state is unknown and needs reconciliation.
           example: 2
           enum:
-            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
         lastStatusUpdateTimestamp:
           type: integer
           description: The unix timestamp when the link deployment status was last updated.
@@ -4347,6 +4384,8 @@ components:
             A mapping of plugin IDs to version constraint strings representing the plugin dependencies required for a given blueprint.
           additionalProperties:
             type: string
+        tagging:
+          $ref: "#/components/schemas/TaggingConfig"
       example:
         providers:
           aws:
@@ -4362,6 +4401,43 @@ components:
         dependencies:
           newstack-cloud/aws: "^1.5.0"
           newstack-cloud/celerity: "1.0.0"
+        tagging:
+          enabled: true
+          prefix: "bluelink:"
+
+    TaggingConfig:
+      type: object
+      description: |
+        Configuration for Bluelink system-level resource tagging.
+        Bluelink automatically applies provenance tags to resources to help with tracking,
+        auditing, and identifying resources that are managed by Bluelink.
+
+        **Important:** The `enabled` setting only controls system-level tags that Bluelink
+        automatically applies to resources. User-defined tags specified in resource specs
+        (e.g., in `metadata.labels` or provider-specific tag fields) will always be applied
+        regardless of this setting.
+      properties:
+        enabled:
+          type: boolean
+          description: |
+            Controls whether Bluelink system-level tags are applied to resources.
+            When set to `false`, only user-defined tags from resource specs are applied.
+            System-level tags include provenance information such as instance ID, resource name,
+            deploy engine version, and provider plugin details.
+          default: true
+          example: true
+        prefix:
+          type: string
+          description: |
+            The prefix applied to all Bluelink system-level tag keys.
+            This can be customized to match your organization's tagging conventions.
+            For example, setting this to `"myorg:bluelink:"` would result in tags like
+            `myorg:bluelink:instance-id` instead of `bluelink:instance-id`.
+          default: "bluelink:"
+          example: "bluelink:"
+      example:
+        enabled: true
+        prefix: "bluelink:"
 
     AnyValue:
       description: |

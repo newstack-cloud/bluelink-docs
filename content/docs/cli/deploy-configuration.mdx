@@ -49,6 +49,10 @@ This file is expected to contain the following structure:
   },
   "dependencies": {
     "<plugin-id>": "<version-constraint> (string)"
+  },
+  "tagging": {
+    "enabled": "<boolean>",
+    "prefix": "<string>"
   }
 }
 ```
@@ -107,6 +111,69 @@ For deploying to a remote instance of the deploy engine, the `dependencies` list
 for the remote instance.
 
 Bluelink does **_not_** support transitive dependencies between plugins, you must declare all the plugins to be used by your project in the `dependencies` section.
+
+### Tagging
+
+The `tagging` section controls the behavior of Bluelink system-level tags that are applied to resources during deployment.
+Bluelink automatically applies provenance tags to resources to help with tracking, auditing, and identifying resources that are managed by Bluelink.
+
+<Callout title="User-defined tags" type="info">
+The `enabled` setting only controls **system-level tags** that Bluelink automatically applies to resources.
+User-defined tags specified in resource specs (e.g., in `metadata.labels` or provider-specific tag fields) will always be applied regardless of this setting.
+</Callout>
+
+The tagging configuration has the following properties:
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `enabled` | boolean | `true` | Controls whether Bluelink system-level tags are applied to resources. When `false`, only user-defined tags from resource specs are applied. |
+| `prefix` | string | `"bluelink:"` | The prefix applied to all Bluelink tag keys. This can be customized to match your organization's tagging conventions (e.g., `"myorg:bluelink:"`). |
+
+When tagging is enabled, the following system-level tags are applied to resources:
+
+| Tag Key | Description |
+|---------|-------------|
+| `{prefix}instance-id` | The unique identifier for the blueprint instance |
+| `{prefix}instance-name` | The user-defined name for the blueprint instance |
+| `{prefix}resource-name` | The logical name of the resource in the blueprint |
+| `{prefix}resource-type` | The fully-qualified resource type (e.g., `aws/lambda/function`) |
+| `{prefix}provisioned-by` | Marker indicating the resource is managed by Bluelink |
+| `{prefix}deploy-engine-version` | The version of the Deploy Engine used for deployment |
+| `{prefix}provider-plugin-id` | The identifier for the provider plugin (e.g., `bluelink/aws`) |
+| `{prefix}provider-plugin-version` | The version of the provider plugin |
+
+Example with custom tagging configuration:
+
+```javascript
+{
+  "providers": {
+    "aws": {
+      "accessKeyId": "${AWS_ACCESS_KEY_ID}",
+      "secretAccessKey": "${AWS_SECRET_ACCESS_KEY}"
+    }
+  },
+  "tagging": {
+    "enabled": true,
+    "prefix": "myorg:bluelink:"
+  }
+}
+```
+
+Example with system-level tagging disabled:
+
+```javascript
+{
+  "providers": {
+    "aws": {
+      "accessKeyId": "${AWS_ACCESS_KEY_ID}",
+      "secretAccessKey": "${AWS_SECRET_ACCESS_KEY}"
+    }
+  },
+  "tagging": {
+    "enabled": false
+  }
+}
+```
 
 ## Multiple Environments
 
