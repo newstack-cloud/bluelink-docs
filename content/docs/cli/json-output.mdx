@@ -1,0 +1,1122 @@
+---
+title: JSON Output Reference
+description: Detailed JSON output examples for Bluelink CLI commands
+---
+
+This document provides detailed examples of the JSON output format for Bluelink CLI commands when using the `--json` flag.
+JSON output mode is useful for CI/CD pipelines, scripting, and programmatic tooling consumption.
+
+When `--json` is enabled, the CLI outputs a single JSON object to stdout when the operation completes.
+This implies non-interactive mode (no TUI, no streaming text output).
+
+## Stage Command
+
+The `bluelink stage` command outputs JSON describing the staged changes, including new resources, resource changes, child blueprint changes, exports, and a summary.
+
+### Successful Staging (New Deployment)
+
+When staging changes for a new blueprint instance, the output includes the new resources to be created:
+
+```json
+{
+  "success": true,
+  "changesetId": "a471bbb8-1267-4e65-873b-fa86bca71fcf",
+  "instanceId": "",
+  "instanceName": "my-stack",
+  "changes": {
+    "newResources": {
+      "orderQueue": {
+        "appliedResourceInfo": {
+          "resourceId": "",
+          "resourceName": "orderQueue",
+          "instanceId": "",
+          "currentResourceState": null,
+          "resourceWithResolvedSubs": {
+            "type": { "value": "aws/sqs/queue" },
+            "spec": {
+              "queueName": "my-app-order-queue",
+              "visibilityTimeout": 30,
+              "messageRetentionPeriod": 86400
+            }
+          }
+        },
+        "mustRecreate": false,
+        "modifiedFields": null,
+        "newFields": [
+          { "fieldPath": "spec.queueName", "prevValue": null, "newValue": "my-app-order-queue", "mustRecreate": false, "sensitive": false },
+          { "fieldPath": "spec.visibilityTimeout", "prevValue": null, "newValue": 30, "mustRecreate": false, "sensitive": false }
+        ],
+        "removedFields": null,
+        "unchangedFields": null,
+        "computedFields": ["spec.arn", "spec.queueUrl"],
+        "fieldChangesKnownOnDeploy": null,
+        "conditionKnownOnDeploy": true,
+        "newOutboundLinks": null,
+        "outboundLinkChanges": null,
+        "removedOutboundLinks": null
+      }
+    },
+    "resourceChanges": {},
+    "removedResources": [],
+    "removedLinks": [],
+    "newChildren": {},
+    "childChanges": {},
+    "recreateChildren": [],
+    "removedChildren": [],
+    "newExports": {
+      "queueArn": {
+        "fieldPath": "queueArn",
+        "prevValue": null,
+        "newValue": "${resources.orderQueue.spec.arn}",
+        "mustRecreate": false,
+        "sensitive": false
+      }
+    },
+    "exportChanges": {},
+    "unchangedExports": [],
+    "removedExports": [],
+    "metadataChanges": {
+      "newFields": [],
+      "modifiedFields": [],
+      "unchangedFields": [],
+      "removedFields": []
+    },
+    "resolveOnDeploy": ["exports[\"queueArn\"]"]
+  },
+  "summary": {
+    "resources": { "total": 1, "create": 1, "update": 0, "delete": 0, "recreate": 0 },
+    "children": { "total": 0, "create": 0, "update": 0, "delete": 0 },
+    "links": { "total": 0, "create": 0, "update": 0, "delete": 0 },
+    "exports": { "total": 1, "new": 1, "modified": 0, "removed": 0, "unchanged": 0 }
+  }
+}
+```
+
+### Successful Staging (Update to Existing Deployment)
+
+When staging changes for an existing blueprint instance, the output includes the current resource state and the changes to be applied:
+
+```json
+{
+  "success": true,
+  "changesetId": "b582ccc9-2378-5f76-984c-gb97dcb82gdf",
+  "instanceId": "2fde4a0f-b236-4a34-9442-cd8232745854",
+  "instanceName": "my-stack",
+  "changes": {
+    "newResources": {},
+    "resourceChanges": {
+      "orderQueue": {
+        "appliedResourceInfo": {
+          "resourceId": "c0d45f4c-3bc6-433a-839e-71c8054246da",
+          "resourceName": "orderQueue",
+          "instanceId": "2fde4a0f-b236-4a34-9442-cd8232745854",
+          "currentResourceState": {
+            "id": "c0d45f4c-3bc6-433a-839e-71c8054246da",
+            "name": "orderQueue",
+            "type": "aws/sqs/queue",
+            "instanceId": "2fde4a0f-b236-4a34-9442-cd8232745854",
+            "status": 2,
+            "preciseStatus": 3,
+            "specData": {
+              "arn": "arn:aws:sqs:eu-west-2:123456789:my-app-order-queue",
+              "queueName": "my-app-order-queue",
+              "queueUrl": "https://sqs.eu-west-2.amazonaws.com/123456789/my-app-order-queue",
+              "visibilityTimeout": 30
+            }
+          },
+          "resourceWithResolvedSubs": {
+            "type": { "value": "aws/sqs/queue" },
+            "spec": {
+              "queueName": "my-app-order-queue",
+              "visibilityTimeout": 60
+            }
+          }
+        },
+        "mustRecreate": false,
+        "modifiedFields": [
+          { "fieldPath": "spec.visibilityTimeout", "prevValue": 30, "newValue": 60, "mustRecreate": false, "sensitive": false }
+        ],
+        "newFields": null,
+        "removedFields": null,
+        "unchangedFields": ["spec.queueName", "spec.messageRetentionPeriod"],
+        "computedFields": ["spec.arn", "spec.queueUrl"],
+        "fieldChangesKnownOnDeploy": null,
+        "conditionKnownOnDeploy": true,
+        "newOutboundLinks": null,
+        "outboundLinkChanges": null,
+        "removedOutboundLinks": null
+      }
+    },
+    "removedResources": [],
+    "removedLinks": [],
+    "newChildren": {},
+    "childChanges": {},
+    "recreateChildren": [],
+    "removedChildren": [],
+    "newExports": {},
+    "exportChanges": {},
+    "unchangedExports": ["queueArn"],
+    "removedExports": [],
+    "metadataChanges": {
+      "newFields": [],
+      "modifiedFields": [],
+      "unchangedFields": [],
+      "removedFields": []
+    },
+    "resolveOnDeploy": []
+  },
+  "summary": {
+    "resources": { "total": 1, "create": 0, "update": 1, "delete": 0, "recreate": 0 },
+    "children": { "total": 0, "create": 0, "update": 0, "delete": 0 },
+    "links": { "total": 0, "create": 0, "update": 0, "delete": 0 },
+    "exports": { "total": 1, "new": 0, "modified": 0, "removed": 0, "unchanged": 1 }
+  }
+}
+```
+
+### Drift Detected
+
+When drift is detected during change staging, the CLI returns reconciliation information
+that must be resolved before changes can be staged. The `reconciliation` object contains
+detailed information about each drifted resource, including the persisted state, external state,
+and the detected changes.
+
+```json
+{
+  "success": true,
+  "driftDetected": true,
+  "instanceId": "",
+  "instanceName": "my-simple-app",
+  "message": "Drift detected. External changes to resources require reconciliation before staging changes.",
+  "reconciliation": {
+    "instanceId": "2fde4a0f-b236-4a34-9442-cd8232745854",
+    "resources": [
+      {
+        "resourceId": "c0d45f4c-3bc6-433a-839e-71c8054246da",
+        "resourceName": "childQueue",
+        "resourceType": "aws/sqs/queue",
+        "childPath": "child",
+        "type": "drift",
+        "oldStatus": 3,
+        "newStatus": 3,
+        "externalState": {
+          "arn": "arn:aws:sqs:eu-west-2:027653366630:bluelink-simple-test-child-queue",
+          "messageRetentionPeriod": 86400,
+          "queueName": "bluelink-simple-test-child-queue",
+          "queueUrl": "https://sqs.eu-west-2.amazonaws.com/027653366630/bluelink-simple-test-child-queue",
+          "sqsManagedSseEnabled": true,
+          "tags": [
+            { "key": "Purpose", "value": "child" },
+            { "key": "ManagedBy", "value": "bluelink" }
+          ],
+          "visibilityTimeout": 60
+        },
+        "persistedState": {
+          "arn": "arn:aws:sqs:eu-west-2:027653366630:bluelink-simple-test-child-queue",
+          "messageRetentionPeriod": 86400,
+          "queueName": "bluelink-simple-test-child-queue",
+          "queueUrl": "https://sqs.eu-west-2.amazonaws.com/027653366630/bluelink-simple-test-child-queue",
+          "sqsManagedSseEnabled": true,
+          "tags": [
+            { "key": "Purpose", "value": "child" },
+            { "key": "ManagedBy", "value": "bluelink" }
+          ],
+          "visibilityTimeout": 60
+        },
+        "changes": {
+          "appliedResourceInfo": {
+            "resourceId": "",
+            "resourceName": "",
+            "instanceId": "",
+            "currentResourceState": null,
+            "resourceWithResolvedSubs": null
+          },
+          "mustRecreate": false,
+          "modifiedFields": [
+            {
+              "fieldPath": "spec.visibilityTimeout",
+              "prevValue": 60,
+              "newValue": 120,
+              "mustRecreate": false,
+              "sensitive": false
+            }
+          ],
+          "newFields": null,
+          "removedFields": null,
+          "unchangedFields": null,
+          "computedFields": null,
+          "fieldChangesKnownOnDeploy": null,
+          "conditionKnownOnDeploy": false,
+          "newOutboundLinks": null,
+          "outboundLinkChanges": null,
+          "removedOutboundLinks": null
+        },
+        "resourceExists": true,
+        "recommendedAction": "accept_external"
+      }
+    ],
+    "links": [],
+    "hasInterrupted": false,
+    "hasDrift": true,
+    "hasChildIssues": true
+  }
+}
+```
+
+#### Reconciliation Fields
+
+| Field | Description |
+|-------|-------------|
+| `reconciliation.instanceId` | The ID of the blueprint instance with drift |
+| `reconciliation.resources` | Array of resources that have drifted or are in interrupted state |
+| `reconciliation.resources[].resourceId` | The unique identifier of the drifted resource |
+| `reconciliation.resources[].resourceName` | The logical name of the resource in the blueprint |
+| `reconciliation.resources[].resourceType` | The type of the resource (e.g., `aws/sqs/queue`) |
+| `reconciliation.resources[].childPath` | Path to child blueprint if resource is in a child (empty for root) |
+| `reconciliation.resources[].type` | Type of issue: `drift` or `interrupted` |
+| `reconciliation.resources[].externalState` | Current state of the resource in the cloud provider |
+| `reconciliation.resources[].persistedState` | State stored in the deploy engine |
+| `reconciliation.resources[].changes` | Detailed field-level changes between blueprint and external state |
+| `reconciliation.resources[].resourceExists` | Whether the resource exists in the cloud provider |
+| `reconciliation.resources[].recommendedAction` | Suggested action: `accept_external`, `update_status`, or `manual_cleanup_required` |
+| `reconciliation.links` | Array of links that have drifted |
+| `reconciliation.hasInterrupted` | Whether any resources are in interrupted state |
+| `reconciliation.hasDrift` | Whether drift was detected in any resources |
+| `reconciliation.hasChildIssues` | Whether issues exist in child blueprints |
+
+### Successful Staging (With Child Blueprint Changes)
+
+This example shows staging results for a blueprint with nested child blueprints.
+The `childChanges` field contains the recursive changes for each child blueprint.
+
+```json
+{
+  "success": true,
+  "changesetId": "8df902f1-a01a-476e-b52b-fcb9ffd1b8ce",
+  "instanceName": "my-simple-app",
+  "changes": {
+    "newResources": {},
+    "resourceChanges": {},
+    "removedResources": null,
+    "removedLinks": null,
+    "newChildren": {},
+    "childChanges": {
+      "child": {
+        "newResources": {},
+        "resourceChanges": {},
+        "removedResources": null,
+        "removedLinks": null,
+        "newChildren": {},
+        "childChanges": {},
+        "recreateChildren": [],
+        "removedChildren": null,
+        "newExports": {},
+        "exportChanges": {
+          "childQueueUrl": {
+            "fieldPath": "resources.childQueue.spec.queueUrl",
+            "prevValue": "https://sqs.eu-west-2.amazonaws.com/027653366630/bluelink-simple-test-child-queue",
+            "newValue": null,
+            "mustRecreate": false,
+            "sensitive": false
+          }
+        },
+        "unchangedExports": null,
+        "removedExports": [],
+        "metadataChanges": {
+          "newFields": [],
+          "modifiedFields": [],
+          "unchangedFields": [],
+          "removedFields": []
+        },
+        "resolveOnDeploy": [
+          "exports.childQueueUrl"
+        ]
+      }
+    },
+    "recreateChildren": [],
+    "removedChildren": null,
+    "newExports": {},
+    "exportChanges": {
+      "mainQueueUrl": {
+        "fieldPath": "resources.mainQueue.spec.queueUrl",
+        "prevValue": "https://sqs.eu-west-2.amazonaws.com/027653366630/bluelink-simple-test-main-queue",
+        "newValue": null,
+        "mustRecreate": false,
+        "sensitive": false
+      },
+      "roleArn": {
+        "fieldPath": "resources.lambdaRole.spec.arn",
+        "prevValue": "arn:aws:iam::027653366630:role/bluelink-simple-test-role",
+        "newValue": null,
+        "mustRecreate": false,
+        "sensitive": false
+      }
+    },
+    "unchangedExports": null,
+    "removedExports": [],
+    "metadataChanges": {
+      "newFields": [],
+      "modifiedFields": [],
+      "unchangedFields": [],
+      "removedFields": []
+    },
+    "resolveOnDeploy": [
+      "exports.roleArn",
+      "exports.mainQueueUrl"
+    ]
+  },
+  "summary": {
+    "resources": {
+      "total": 2,
+      "create": 0,
+      "update": 0,
+      "delete": 0,
+      "recreate": 0
+    },
+    "children": {
+      "total": 1,
+      "create": 0,
+      "update": 0,
+      "delete": 0
+    },
+    "links": {
+      "total": 0,
+      "create": 0,
+      "update": 0,
+      "delete": 0
+    },
+    "exports": {
+      "total": 2,
+      "new": 0,
+      "modified": 0,
+      "removed": 0,
+      "unchanged": 2
+    }
+  }
+}
+```
+
+### No Changes Detected
+
+When the blueprint matches the current deployed state, staging returns an empty change set:
+
+```json
+{
+  "success": true,
+  "changesetId": "",
+  "instanceId": "2fde4a0f-b236-4a34-9442-cd8232745854",
+  "instanceName": "my-stack",
+  "message": "No changes detected",
+  "changes": null,
+  "summary": {
+    "resources": { "total": 0, "create": 0, "update": 0, "delete": 0, "recreate": 0 },
+    "children": { "total": 0, "create": 0, "update": 0, "delete": 0 },
+    "links": { "total": 0, "create": 0, "update": 0, "delete": 0 },
+    "exports": { "total": 0, "new": 0, "modified": 0, "removed": 0, "unchanged": 0 }
+  }
+}
+```
+
+### Error (Validation Failure)
+
+When blueprint validation fails during staging:
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "validation",
+    "message": "Blueprint validation failed",
+    "diagnostics": [
+      {
+        "level": "ERROR",
+        "message": "Unknown resource type 'aws/invalid/type'",
+        "line": 15,
+        "column": 5
+      }
+    ]
+  }
+}
+```
+
+### Error (Instance Not Found)
+
+When the specified instance does not exist:
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "not_found",
+    "message": "Blueprint instance 'my-nonexistent-stack' not found"
+  }
+}
+```
+
+---
+
+## Deploy Command
+
+The `bluelink deploy` command outputs JSON describing the deployment result, including the final instance state and any errors.
+
+### Successful Deployment
+
+When a deployment completes successfully, the output includes the full instance state with all resources, child blueprints, exports, and a summary of what was deployed:
+
+```json
+{
+  "success": true,
+  "instanceId": "4ef03ec5-9dba-4e05-a966-2b63b501f553",
+  "instanceName": "my-simple-app",
+  "changesetId": "6d5a7220-740c-4ba9-8b2d-1c7b231f230f",
+  "status": "DEPLOYED",
+  "instanceState": {
+    "id": "4ef03ec5-9dba-4e05-a966-2b63b501f553",
+    "name": "my-simple-app",
+    "status": 2,
+    "lastStatusUpdateTimestamp": 1767369512,
+    "lastDeployedTimestamp": 1767369512,
+    "lastDeployAttemptTimestamp": 1767369512,
+    "resourceIds": {
+      "lambdaRole": "18dadb98-e254-45bc-8745-697e33300dfb",
+      "mainQueue": "659ed005-441e-42eb-aebb-4c890b26dc14"
+    },
+    "resources": {
+      "18dadb98-e254-45bc-8745-697e33300dfb": {
+        "id": "18dadb98-e254-45bc-8745-697e33300dfb",
+        "name": "lambdaRole",
+        "type": "aws/iam/role",
+        "instanceId": "4ef03ec5-9dba-4e05-a966-2b63b501f553",
+        "status": 2,
+        "preciseStatus": 3,
+        "lastStatusUpdateTimestamp": 1767369512,
+        "lastDeployedTimestamp": 1767369512,
+        "lastDeployAttemptTimestamp": 1767369512,
+        "specData": {
+          "arn": "arn:aws:iam::027653366630:role/bluelink-simple-test-role",
+          "assumeRolePolicyDocument": {
+            "Statement": [
+              {
+                "Action": ["sts:AssumeRole"],
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": ["lambda.amazonaws.com"]
+                }
+              }
+            ],
+            "Version": "2012-10-17"
+          },
+          "description": "Role for test environment",
+          "managedPolicyArns": [
+            "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+          ],
+          "roleId": "AROAQM4CE4NTBBJVO45SI",
+          "roleName": "bluelink-simple-test-role",
+          "tags": [
+            { "key": "Environment", "value": "test" },
+            { "key": "ManagedBy", "value": "bluelink" }
+          ]
+        },
+        "computedFields": ["spec.roleId", "spec.arn"],
+        "metadata": {
+          "displayName": "Lambda Role"
+        },
+        "failureReasons": null,
+        "durations": {
+          "configCompleteDuration": 740.483,
+          "totalDuration": 5743.239,
+          "attemptDurations": [740.483]
+        }
+      },
+      "659ed005-441e-42eb-aebb-4c890b26dc14": {
+        "id": "659ed005-441e-42eb-aebb-4c890b26dc14",
+        "name": "mainQueue",
+        "type": "aws/sqs/queue",
+        "instanceId": "4ef03ec5-9dba-4e05-a966-2b63b501f553",
+        "status": 2,
+        "preciseStatus": 3,
+        "lastStatusUpdateTimestamp": 1767369511,
+        "lastDeployedTimestamp": 1767369511,
+        "lastDeployAttemptTimestamp": 1767369511,
+        "specData": {
+          "arn": "arn:aws:sqs:eu-west-2:027653366630:bluelink-simple-test-main-queue",
+          "messageRetentionPeriod": 86400,
+          "queueName": "bluelink-simple-test-main-queue",
+          "queueUrl": "https://sqs.eu-west-2.amazonaws.com/027653366630/bluelink-simple-test-main-queue",
+          "sqsManagedSseEnabled": true,
+          "tags": [
+            { "key": "Environment", "value": "test" },
+            { "key": "ManagedBy", "value": "bluelink" }
+          ],
+          "visibilityTimeout": 60
+        },
+        "computedFields": ["spec.arn", "spec.queueUrl"],
+        "metadata": {
+          "displayName": "Main Queue"
+        },
+        "failureReasons": null,
+        "durations": {
+          "configCompleteDuration": 189.325,
+          "totalDuration": 5189.655,
+          "attemptDurations": [189.325]
+        }
+      }
+    },
+    "links": {},
+    "metadata": null,
+    "exports": {
+      "mainQueueUrl": {
+        "value": "https://sqs.eu-west-2.amazonaws.com/027653366630/bluelink-simple-test-main-queue",
+        "type": "string",
+        "field": "resources.mainQueue.spec.queueUrl"
+      },
+      "roleArn": {
+        "value": "arn:aws:iam::027653366630:role/bluelink-simple-test-role",
+        "type": "string",
+        "field": "resources.lambdaRole.spec.arn"
+      }
+    },
+    "childBlueprints": {
+      "child": {
+        "id": "0a69cdfd-5b87-477d-bd90-d329db4768cb",
+        "name": "my-simple-app-child",
+        "status": 2,
+        "lastStatusUpdateTimestamp": 1767369511,
+        "lastDeployedTimestamp": 1767369511,
+        "lastDeployAttemptTimestamp": 1767369511,
+        "resourceIds": {
+          "childQueue": "ab9573a9-7102-4832-92cb-455c3e4e0dd2"
+        },
+        "resources": {
+          "ab9573a9-7102-4832-92cb-455c3e4e0dd2": {
+            "id": "ab9573a9-7102-4832-92cb-455c3e4e0dd2",
+            "name": "childQueue",
+            "type": "aws/sqs/queue",
+            "instanceId": "0a69cdfd-5b87-477d-bd90-d329db4768cb",
+            "status": 2,
+            "preciseStatus": 3,
+            "lastStatusUpdateTimestamp": 1767369511,
+            "lastDeployedTimestamp": 1767369511,
+            "lastDeployAttemptTimestamp": 1767369511,
+            "specData": {
+              "arn": "arn:aws:sqs:eu-west-2:027653366630:bluelink-simple-test-child-queue",
+              "messageRetentionPeriod": 86400,
+              "queueName": "bluelink-simple-test-child-queue",
+              "queueUrl": "https://sqs.eu-west-2.amazonaws.com/027653366630/bluelink-simple-test-child-queue",
+              "sqsManagedSseEnabled": true,
+              "tags": [
+                { "key": "Purpose", "value": "child" },
+                { "key": "ManagedBy", "value": "bluelink" }
+              ],
+              "visibilityTimeout": 60
+            },
+            "computedFields": ["spec.arn", "spec.queueUrl"],
+            "metadata": {
+              "displayName": "Child Queue"
+            },
+            "failureReasons": null,
+            "durations": {
+              "configCompleteDuration": 184.361,
+              "totalDuration": 5185.974,
+              "attemptDurations": [184.361]
+            }
+          }
+        },
+        "links": {},
+        "metadata": null,
+        "exports": {
+          "childQueueUrl": {
+            "value": "https://sqs.eu-west-2.amazonaws.com/027653366630/bluelink-simple-test-child-queue",
+            "type": "string",
+            "field": "resources.childQueue.spec.queueUrl"
+          }
+        },
+        "childBlueprints": null,
+        "durations": {
+          "prepareDuration": 4.07,
+          "totalDuration": 5196.314
+        }
+      }
+    },
+    "childDependencies": {
+      "child": {}
+    },
+    "durations": {
+      "prepareDuration": 9.03,
+      "totalDuration": 5773.11
+    }
+  },
+  "summary": {
+    "successful": 4,
+    "failed": 0,
+    "interrupted": 0,
+    "elements": [
+      {
+        "name": "lambdaRole",
+        "path": "resources.lambdaRole",
+        "type": "resource",
+        "status": "success",
+        "action": "created"
+      },
+      {
+        "name": "mainQueue",
+        "path": "resources.mainQueue",
+        "type": "resource",
+        "status": "success",
+        "action": "created"
+      },
+      {
+        "name": "child",
+        "path": "children.child",
+        "type": "child",
+        "status": "success",
+        "action": "deployed"
+      },
+      {
+        "name": "childQueue",
+        "path": "children.child::resources.childQueue",
+        "type": "resource",
+        "status": "success",
+        "action": "created"
+      }
+    ]
+  }
+}
+```
+
+#### Deploy Output Fields
+
+| Field | Description |
+|-------|-------------|
+| `success` | Whether the deployment completed successfully |
+| `instanceId` | The unique identifier of the deployed blueprint instance |
+| `instanceName` | The user-defined name of the blueprint instance |
+| `changesetId` | The ID of the changeset that was deployed |
+| `status` | The deployment status (e.g., `DEPLOYED`, `DEPLOY_FAILED`) |
+| `instanceState` | The complete state of the blueprint instance after deployment |
+| `instanceState.resources` | Map of resource IDs to their deployed state including `specData` |
+| `instanceState.exports` | The resolved export values from the blueprint |
+| `instanceState.childBlueprints` | Nested child blueprint instances with their own resources and exports |
+| `instanceState.durations` | Timing information for the deployment |
+| `summary.successful` | Count of successfully deployed elements |
+| `summary.failed` | Count of failed elements |
+| `summary.interrupted` | Count of interrupted elements |
+| `summary.elements` | Array of all deployed elements with their status and action |
+
+### Deployment Failed
+
+```json
+{
+  "success": false,
+  "instanceId": "2fde4a0f-b236-4a34-9442-cd8232745854",
+  "instanceName": "my-stack",
+  "status": "failed",
+  "error": {
+    "type": "deployment",
+    "message": "Deployment failed"
+  },
+  "failureReasons": []
+  // Detailed failure information will be documented here
+}
+```
+
+### Deployment Drift Detected
+
+When using `--stage` with the deploy command and drift is detected during the staging process, the CLI will return a drift response instead of proceeding with deployment. This indicates that external changes have been made to resources and reconciliation is required before staging changes.
+
+```json
+{
+  "success": true,
+  "driftDetected": true,
+  "instanceId": "448faaf7-7b83-4d6a-9bd4-9e6deae578ba",
+  "instanceName": "my-simple-app",
+  "message": "Drift detected. External changes to resources require reconciliation before staging changes.",
+  "reconciliation": {
+    "instanceId": "448faaf7-7b83-4d6a-9bd4-9e6deae578ba",
+    "resources": [
+      {
+        "resourceId": "d7ec762f-4613-4b27-ab98-1e8cef745218",
+        "resourceName": "childQueue",
+        "resourceType": "aws/sqs/queue",
+        "childPath": "child",
+        "type": "drift",
+        "oldStatus": 3,
+        "newStatus": 3,
+        "externalState": {
+          "arn": "arn:aws:sqs:eu-west-2:027653366630:bluelink-simple-test-child-queue",
+          "messageRetentionPeriod": 86400,
+          "queueName": "bluelink-simple-test-child-queue",
+          "queueUrl": "https://sqs.eu-west-2.amazonaws.com/027653366630/bluelink-simple-test-child-queue",
+          "sqsManagedSseEnabled": true,
+          "tags": [
+            {
+              "key": "Purpose",
+              "value": "child"
+            },
+            {
+              "key": "ManagedBy",
+              "value": "bluelink"
+            }
+          ],
+          "visibilityTimeout": 60
+        },
+        "persistedState": {
+          "arn": "arn:aws:sqs:eu-west-2:027653366630:bluelink-simple-test-child-queue",
+          "messageRetentionPeriod": 86400,
+          "queueName": "bluelink-simple-test-child-queue",
+          "queueUrl": "https://sqs.eu-west-2.amazonaws.com/027653366630/bluelink-simple-test-child-queue",
+          "sqsManagedSseEnabled": true,
+          "tags": [
+            {
+              "key": "Purpose",
+              "value": "child"
+            },
+            {
+              "key": "ManagedBy",
+              "value": "bluelink"
+            }
+          ],
+          "visibilityTimeout": 60
+        },
+        "changes": {
+          "appliedResourceInfo": {
+            "resourceId": "",
+            "resourceName": "",
+            "instanceId": "",
+            "currentResourceState": null,
+            "resourceWithResolvedSubs": null
+          },
+          "mustRecreate": false,
+          "modifiedFields": [
+            {
+              "fieldPath": "spec.visibilityTimeout",
+              "prevValue": 60,
+              "newValue": 120,
+              "mustRecreate": false,
+              "sensitive": false
+            }
+          ],
+          "newFields": null,
+          "removedFields": null,
+          "unchangedFields": null,
+          "computedFields": null,
+          "fieldChangesKnownOnDeploy": null,
+          "conditionKnownOnDeploy": false,
+          "newOutboundLinks": null,
+          "outboundLinkChanges": null,
+          "removedOutboundLinks": null
+        },
+        "resourceExists": true,
+        "recommendedAction": "accept_external"
+      }
+    ],
+    "links": [],
+    "hasInterrupted": false,
+    "hasDrift": true,
+    "hasChildIssues": true
+  }
+}
+```
+
+#### Deployment Drift Fields
+
+| Field | Description |
+|-------|-------------|
+| `driftDetected` | `true` when drift has been detected during staging |
+| `message` | Human-readable message explaining that reconciliation is required |
+| `reconciliation` | The full reconciliation check result with drift details |
+| `reconciliation.resources` | Array of resources with drift or interrupted state |
+| `reconciliation.resources[].childPath` | Path to the child blueprint if the resource is in a child (empty for root) |
+| `reconciliation.resources[].type` | Type of issue: `drift` or `interrupted` |
+| `reconciliation.resources[].oldStatus` | The previous status of the resource (integer status code) |
+| `reconciliation.resources[].newStatus` | The new/current status of the resource (integer status code) |
+| `reconciliation.resources[].externalState` | Current state of the resource in the external system |
+| `reconciliation.resources[].persistedState` | State stored in the deploy engine |
+| `reconciliation.resources[].changes` | Detailed field-level changes between blueprint and external state |
+| `reconciliation.resources[].changes.modifiedFields` | Array of fields that have different values |
+| `reconciliation.resources[].resourceExists` | Whether the resource exists in the external system |
+| `reconciliation.resources[].recommendedAction` | Suggested action: `accept_external`, `update_status`, or `manual_cleanup_required` |
+| `reconciliation.links` | Array of links with drift |
+| `reconciliation.hasInterrupted` | Whether any resources are in interrupted state |
+| `reconciliation.hasDrift` | Whether drift was detected in any resources |
+| `reconciliation.hasChildIssues` | Whether issues exist in child blueprints |
+
+### Deployment Rollback Complete
+
+When `--auto-rollback` is enabled and a deployment fails, the CLI will automatically attempt to rollback to the previous state. The following example shows a successful rollback after a failed deployment:
+
+```json
+{
+  "success": true,
+  "instanceId": "2fde4a0f-b236-4a34-9442-cd8232745854",
+  "instanceName": "my-stack",
+  "changesetId": "cset-a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "status": "DEPLOY ROLLBACK COMPLETE",
+  "instanceState": {
+    "id": "2fde4a0f-b236-4a34-9442-cd8232745854",
+    "name": "my-stack",
+    "status": 6,
+    "lastStatusUpdateTimestamp": 1735850400,
+    "lastDeployedTimestamp": 1735846800,
+    "lastDeployAttemptTimestamp": 1735850400,
+    "resourceIds": {
+      "dynamoDBTable": "123e4567-e89b-12d3-a456-426614174000",
+      "sqsQueue": "234f5678-f90c-23e4-b567-537725285111"
+    },
+    "resources": {
+      "123e4567-e89b-12d3-a456-426614174000": {
+        "id": "123e4567-e89b-12d3-a456-426614174000",
+        "name": "dynamoDBTable",
+        "type": "aws/dynamodb/table",
+        "status": 3,
+        "preciseStatus": 4,
+        "failureReasons": ["Table creation timed out"]
+      },
+      "234f5678-f90c-23e4-b567-537725285111": {
+        "id": "234f5678-f90c-23e4-b567-537725285111",
+        "name": "sqsQueue",
+        "type": "aws/sqs/queue",
+        "status": 5,
+        "preciseStatus": 8
+      }
+    },
+    "links": {
+      "apiGateway::dynamoDBTable": {
+        "id": "345g6789-g01d-34f5-c678-648836396222",
+        "name": "apiGateway::dynamoDBTable",
+        "status": 8,
+        "preciseStatus": 22
+      }
+    },
+    "metadata": {},
+    "exports": {},
+    "childBlueprints": {
+      "coreNetwork": {
+        "id": "456h7890-h12e-45g6-d789-759947407333",
+        "name": "my-stack/coreNetwork",
+        "status": 8,
+        "lastStatusUpdateTimestamp": 1735850400,
+        "lastDeployedTimestamp": 1735846800,
+        "lastDeployAttemptTimestamp": 1735850400,
+        "resourceIds": {
+          "vpc": "567i8901-i23f-56h7-e890-860058518444",
+          "subnet": "678j9012-j34g-67i8-f901-971169629555"
+        },
+        "resources": {
+          "567i8901-i23f-56h7-e890-860058518444": {
+            "id": "567i8901-i23f-56h7-e890-860058518444",
+            "name": "vpc",
+            "type": "aws/ec2/vpc",
+            "status": 5,
+            "preciseStatus": 8
+          },
+          "678j9012-j34g-67i8-f901-971169629555": {
+            "id": "678j9012-j34g-67i8-f901-971169629555",
+            "name": "subnet",
+            "type": "aws/ec2/subnet",
+            "status": 5,
+            "preciseStatus": 8
+          }
+        },
+        "links": {},
+        "metadata": {},
+        "exports": {},
+        "childBlueprints": {},
+        "durations": {
+          "totalDurationMs": 7200,
+          "configCompleteDurationMs": 1200,
+          "prepareDurationMs": 800
+        }
+      }
+    },
+    "durations": {
+      "totalDurationMs": 45200,
+      "configCompleteDurationMs": 1200,
+      "prepareDurationMs": 800
+    }
+  },
+  "preRollbackState": {
+    "instanceId": "2fde4a0f-b236-4a34-9442-cd8232745854",
+    "instanceName": "my-stack",
+    "status": 3,
+    "resources": [
+      {
+        "resourceId": "123e4567-e89b-12d3-a456-426614174000",
+        "resourceName": "dynamoDBTable",
+        "resourceType": "aws/dynamodb/table",
+        "status": 3,
+        "preciseStatus": 4,
+        "failureReasons": ["Table creation timed out"]
+      },
+      {
+        "resourceId": "234f5678-f90c-23e4-b567-537725285111",
+        "resourceName": "sqsQueue",
+        "resourceType": "aws/sqs/queue",
+        "status": 2,
+        "preciseStatus": 3
+      }
+    ],
+    "links": [
+      {
+        "linkId": "345g6789-g01d-34f5-c678-648836396222",
+        "linkName": "apiGateway::dynamoDBTable",
+        "status": 2,
+        "preciseStatus": 9
+      }
+    ],
+    "children": [
+      {
+        "childInstanceId": "456h7890-h12e-45g6-d789-759947407333",
+        "childName": "coreNetwork",
+        "status": 2,
+        "resources": [
+          {
+            "resourceId": "567i8901-i23f-56h7-e890-860058518444",
+            "resourceName": "vpc",
+            "resourceType": "aws/ec2/vpc",
+            "status": 2,
+            "preciseStatus": 3
+          },
+          {
+            "resourceId": "678j9012-j34g-67i8-f901-971169629555",
+            "resourceName": "subnet",
+            "resourceType": "aws/ec2/subnet",
+            "status": 2,
+            "preciseStatus": 3
+          }
+        ],
+        "links": [],
+        "children": []
+      }
+    ],
+    "failureReasons": ["Table creation timed out"],
+    "capturedAt": 1735850350
+  },
+  "summary": {
+    "successful": 2,
+    "failed": 1,
+    "interrupted": 0,
+    "skippedRollbackItems": [
+      {
+        "name": "dynamoDBTable",
+        "type": "resource",
+        "status": "CREATE FAILED",
+        "reason": "Resource was in failed state and could not be rolled back"
+      }
+    ],
+    "elements": [
+      {
+        "name": "dynamoDBTable",
+        "path": "",
+        "type": "resource",
+        "status": "CREATE FAILED",
+        "action": "create",
+        "failureReasons": ["Table creation timed out"]
+      },
+      {
+        "name": "sqsQueue",
+        "path": "",
+        "type": "resource",
+        "status": "DESTROYED",
+        "action": "rolled_back"
+      },
+      {
+        "name": "apiGateway::dynamoDBTable",
+        "path": "",
+        "type": "link",
+        "status": "DESTROYED",
+        "action": "rolled_back"
+      },
+      {
+        "name": "vpc",
+        "path": "coreNetwork",
+        "type": "resource",
+        "status": "DESTROYED",
+        "action": "rolled_back"
+      },
+      {
+        "name": "subnet",
+        "path": "coreNetwork",
+        "type": "resource",
+        "status": "DESTROYED",
+        "action": "rolled_back"
+      }
+    ]
+  }
+}
+```
+
+#### Rollback-Specific Fields
+
+| Field | Description |
+|-------|-------------|
+| `status` | `DEPLOY ROLLBACK COMPLETE` indicates a successful rollback after a failed deployment |
+| `preRollbackState` | A snapshot of the instance state before the rollback began, captured for debugging and auditing |
+| `preRollbackState.resources` | Array of resources that existed before the rollback with their status at capture time |
+| `preRollbackState.links` | Array of links that existed before the rollback |
+| `preRollbackState.children` | Array of child blueprints with their own nested resources, links, and children |
+| `preRollbackState.failureReasons` | Reasons for the deployment failure that triggered the rollback |
+| `preRollbackState.capturedAt` | Unix timestamp when the pre-rollback state was captured |
+| `instanceState` | The current state of the instance after the rollback completed |
+| `summary.skippedRollbackItems` | Array of elements that could not be rolled back |
+| `summary.skippedRollbackItems[].name` | The name of the element that was skipped |
+| `summary.skippedRollbackItems[].type` | The type of element (`resource` or `link`) |
+| `summary.skippedRollbackItems[].childPath` | Path to the child blueprint containing this item (empty for root-level items) |
+| `summary.skippedRollbackItems[].status` | The status that prevented rollback |
+| `summary.skippedRollbackItems[].reason` | Human-readable explanation of why the rollback was skipped |
+| `summary.elements[].action` | For rollback operations, this will be `rolled_back` for elements that were successfully reverted |
+
+---
+
+## Destroy Command
+
+The `bluelink destroy` command outputs JSON describing the destroy operation result.
+
+<Callout title="Coming Soon" type="info">
+Detailed JSON output examples for the destroy command will be added in a future update.
+</Callout>
+
+### Successful Destroy
+
+```json
+{
+  "success": true,
+  "instanceId": "2fde4a0f-b236-4a34-9442-cd8232745854",
+  "instanceName": "my-stack",
+  "status": "destroyed",
+  "message": "Instance destroyed successfully"
+}
+```
+
+### Destroy Failed
+
+```json
+{
+  "success": false,
+  "instanceId": "2fde4a0f-b236-4a34-9442-cd8232745854",
+  "instanceName": "my-stack",
+  "status": "destroy_failed",
+  "error": {
+    "type": "destroy",
+    "message": "Destroy operation failed"
+  },
+  "failureReasons": []
+  // Detailed failure information will be documented here
+}
+```
+
+---
+
+## Common Fields
+
+All JSON outputs share these common fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | boolean | Whether the operation completed successfully |
+| `instanceId` | string | The unique identifier of the blueprint instance (empty for new deployments) |
+| `instanceName` | string | The user-defined name of the blueprint instance |
+| `message` | string | A human-readable message describing the result |
+| `error` | object | Error details when `success` is `false` |
+| `error.type` | string | The type of error (e.g., `validation`, `not_found`, `deployment`) |
+| `error.message` | string | A description of the error |

@@ -150,7 +150,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/BlueprintValidation"
+                $ref: "#/components/schemas/BlueprintValidationResponse"
         "400":
           description: Bad request
           content:
@@ -391,7 +391,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ChangeSet"
+                $ref: "#/components/schemas/ChangeSetResponse"
         "400":
           description: Bad request
           content:
@@ -672,7 +672,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/BlueprintInstance"
+                $ref: "#/components/schemas/BlueprintInstanceResponse"
         "400":
           description: Bad request
           content:
@@ -742,7 +742,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/BlueprintInstance"
+                $ref: "#/components/schemas/BlueprintInstanceResponse"
         "400":
           description: Bad request
           content:
@@ -901,7 +901,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/BlueprintInstance"
+                $ref: "#/components/schemas/BlueprintInstanceResponse"
         "400":
           description: Bad request
           content:
@@ -1014,7 +1014,7 @@ paths:
         Actions can:
         - **accept_external**: Accept external cloud state as truth and update persisted state to match
         - **update_status**: Update the status only without modifying persisted state data
-        - **mark_failed**: Mark the element as failed
+        - **manual_cleanup_required**: Mark the element as requiring manual cleanup
 
         This endpoint should be called after `checkReconciliation` to apply the recommended
         or user-chosen actions for each element that needs reconciliation.
@@ -1142,6 +1142,7 @@ paths:
                       - link
                       - instanceUpdate
                       - finish
+                      - preRollbackState
                       - error
                   id:
                     type: string
@@ -1314,6 +1315,25 @@ components:
           type: integer
           description: The unix timestamp of when the blueprint validation was created in seconds.
           example: 1678901234
+
+    BlueprintValidationResponse:
+      type: object
+      description: |
+        Wrapper response for async blueprint validation operations.
+        Contains the validation data along with streaming metadata.
+      required:
+        - data
+      properties:
+        lastEventId:
+          type: string
+          description: |
+            The ID to use as the starting offset for SSE streaming.
+            Clients should pass this value as the `Last-Event-ID` header when
+            connecting to the stream endpoint to avoid missing events.
+            Omitted if no events have been generated yet.
+          example: 60d7c6c5-3984-42b9-a3c1-ae8a47a9bf55
+        data:
+          $ref: "#/components/schemas/BlueprintValidation"
 
     BlueprintValidationEvent:
       type: object
@@ -1547,6 +1567,7 @@ components:
         - $ref: "#/components/schemas/LinkDeploymentEvent"
         - $ref: "#/components/schemas/InstanceUpdateDeploymentEvent"
         - $ref: "#/components/schemas/FinishDeploymentEvent"
+        - $ref: "#/components/schemas/PreRollbackStateEvent"
         - $ref: "#/components/schemas/ErrorEvent"
 
     ResourceDeploymentEvent:
@@ -1970,6 +1991,299 @@ components:
             - Update Rollback Complete (18)
           allOf:
             - $ref: "#/components/schemas/BlueprintInstanceCompletionDurations"
+          nullable: true
+
+    PreRollbackStateEvent:
+      type: object
+      description: |
+        An event emitted before auto-rollback begins, capturing the instance state
+        for debugging and auditing purposes. This provides a snapshot of the failed
+        deployment state before resources are destroyed or reverted.
+      required:
+        - instanceId
+        - instanceName
+        - status
+        - resources
+        - links
+        - children
+        - failureReasons
+        - capturedAt
+      properties:
+        instanceId:
+          type: string
+          description: The ID of the blueprint instance.
+          example: 16ef8989-af00-4a4a-8164-72493ceb1aa0
+        instanceName:
+          type: string
+          description: The user-provided name of the blueprint instance.
+          example: my-deployment
+        status:
+          type: integer
+          description: |
+            The failed status that triggered the rollback (e.g., DeployFailed).
+            See the `BlueprintInstance` schema definition for more information on what each status means.
+          example: 3
+          enum:
+            [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+            ]
+        resources:
+          type: array
+          description: Snapshots of all resource states before rollback.
+          items:
+            $ref: "#/components/schemas/ResourceSnapshot"
+        links:
+          type: array
+          description: Snapshots of all link states before rollback.
+          items:
+            $ref: "#/components/schemas/LinkSnapshot"
+        children:
+          type: array
+          description: |
+            Snapshots of all child blueprint states before rollback.
+            Each child snapshot recursively includes its own resources, links, and children.
+          items:
+            $ref: "#/components/schemas/ChildSnapshot"
+        failureReasons:
+          type: array
+          description: The reasons for the deployment failure that triggered the rollback.
+          items:
+            type: string
+            example: Resource creation failed for resource "my-resource"
+        capturedAt:
+          type: integer
+          description: The unix timestamp in seconds when the state was captured.
+          example: 1678901234
+
+    ResourceSnapshot:
+      type: object
+      description: A snapshot of a resource's state before rollback.
+      required:
+        - resourceId
+        - resourceName
+        - resourceType
+        - status
+        - preciseStatus
+      properties:
+        resourceId:
+          type: string
+          description: The globally unique ID of the resource.
+          example: 16ef8989-af00-4a4a-8164-72493ceb1aa0
+        resourceName:
+          type: string
+          description: The logical name of the resource in the blueprint.
+          example: my-resource
+        resourceType:
+          type: string
+          description: The type of the resource.
+          example: aws/ec2/instance
+        status:
+          type: integer
+          description: |
+            The high-level status of the resource.
+            See the `ResourceState` schema definition for more information on what each status means.
+          example: 3
+          enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+        preciseStatus:
+          type: integer
+          description: |
+            The precise status of the resource.
+            See the `ResourceState` schema definition for more information on what each status means.
+          example: 4
+          enum:
+            [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25,
+            ]
+        failureReasons:
+          type: array
+          description: Reasons for failure if the resource failed.
+          items:
+            type: string
+            example: Invalid configuration for resource spec
+          nullable: true
+
+    LinkSnapshot:
+      type: object
+      description: A snapshot of a link's state before rollback.
+      required:
+        - linkId
+        - linkName
+        - status
+        - preciseStatus
+      properties:
+        linkId:
+          type: string
+          description: The globally unique ID of the link.
+          example: 16ef8989-af00-4a4a-8164-72493ceb1aa0
+        linkName:
+          type: string
+          description: The logical name of the link (e.g., "vpc::subnet").
+          example: vpc::subnet
+        status:
+          type: integer
+          description: |
+            The high-level status of the link.
+            See the `LinkState` schema definition for more information on what each status means.
+          example: 3
+          enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+        preciseStatus:
+          type: integer
+          description: |
+            The precise status of the link.
+            See the `LinkState` schema definition for more information on what each status means.
+          example: 4
+          enum:
+            [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25,
+            ]
+        failureReasons:
+          type: array
+          description: Reasons for failure if the link failed.
+          items:
+            type: string
+            example: Link implementation failed
+          nullable: true
+
+    ChildSnapshot:
+      type: object
+      description: |
+        A snapshot of a child blueprint's state before rollback.
+        This is recursive - each child includes its own resources, links, and nested children.
+      required:
+        - childInstanceId
+        - childName
+        - status
+        - resources
+        - links
+        - children
+      properties:
+        childInstanceId:
+          type: string
+          description: The ID of the child blueprint instance.
+          example: 26ef8989-af00-4a4a-8164-72493ceb1bb1
+        childName:
+          type: string
+          description: The logical name of the child blueprint in the parent blueprint.
+          example: networking
+        status:
+          type: integer
+          description: |
+            The status of the child blueprint instance.
+            See the `BlueprintInstance` schema definition for more information on what each status means.
+          example: 3
+          enum:
+            [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+            ]
+        resources:
+          type: array
+          description: Snapshots of resources in this child blueprint.
+          items:
+            $ref: "#/components/schemas/ResourceSnapshot"
+        links:
+          type: array
+          description: Snapshots of links in this child blueprint.
+          items:
+            $ref: "#/components/schemas/LinkSnapshot"
+        children:
+          type: array
+          description: Snapshots of nested child blueprints.
+          items:
+            $ref: "#/components/schemas/ChildSnapshot"
+        failureReasons:
+          type: array
+          description: Reasons for failure if the child blueprint failed.
+          items:
+            type: string
+            example: Child deployment failed
           nullable: true
 
     Diagnostic:
@@ -2515,12 +2829,12 @@ components:
             The reconciliation action to apply.
             - `accept_external`: Accept external cloud state as truth and update persisted state
             - `update_status`: Update status only without modifying persisted state data
-            - `mark_failed`: Mark the element as failed
+            - `manual_cleanup_required`: Mark the element as requiring manual cleanup
           example: accept_external
           enum:
             - accept_external
             - update_status
-            - mark_failed
+            - manual_cleanup_required
         externalState:
           type: object
           description: |
@@ -2555,12 +2869,12 @@ components:
             The reconciliation action to apply.
             - `accept_external`: Accept external cloud state as truth and update persisted state
             - `update_status`: Update status only without modifying persisted state data
-            - `mark_failed`: Mark the element as failed
+            - `manual_cleanup_required`: Mark the element as requiring manual cleanup
           example: update_status
           enum:
             - accept_external
             - update_status
-            - mark_failed
+            - manual_cleanup_required
         newStatus:
           type: string
           description: The precise link status to set.
@@ -2589,7 +2903,7 @@ components:
           enum:
             - accept_external
             - update_status
-            - mark_failed
+            - manual_cleanup_required
         externalState:
           type: object
           description: |
@@ -2690,7 +3004,7 @@ components:
           enum:
             - accept_external
             - update_status
-            - mark_failed
+            - manual_cleanup_required
 
     LinkReconcileResult:
       type: object
@@ -2746,7 +3060,7 @@ components:
           enum:
             - accept_external
             - update_status
-            - mark_failed
+            - manual_cleanup_required
 
     IntermediaryReconcileResult:
       type: object
@@ -2899,6 +3213,25 @@ components:
           type: integer
           description: The unix timestamp of when the change set was created in seconds.
           example: 1678901234
+
+    ChangeSetResponse:
+      type: object
+      description: |
+        Wrapper response for async change set creation operations.
+        Contains the change set data along with streaming metadata.
+      required:
+        - data
+      properties:
+        lastEventId:
+          type: string
+          description: |
+            The ID to use as the starting offset for SSE streaming.
+            Clients should pass this value as the `Last-Event-ID` header when
+            connecting to the stream endpoint to avoid missing events.
+            Omitted if no events have been generated yet.
+          example: 60d7c6c5-3984-42b9-a3c1-ae8a47a9bf55
+        data:
+          $ref: "#/components/schemas/ChangeSet"
 
     ChangeSetChanges:
       type: object
@@ -3091,6 +3424,12 @@ components:
           type: boolean
           description: |
             If true, the resource must be recreated to apply the change.
+          example: false
+        sensitive:
+          type: boolean
+          description: |
+            Indicates whether the field is sensitive and the values
+            should be redacted in logs and outputs.
           example: false
 
     ResourceChanges:
@@ -3441,6 +3780,16 @@ components:
             handler: index.handler
             runtime: nodejs20.x
             arn: arn:aws:lambda:us-east-1:123456789012:function:my-lambda-function
+        computedFields:
+          type: array
+          description: |
+            Field paths that are computed at deploy time by the provider
+            (e.g., ARN, URL, external ID). Used by clients to display
+            "Outputs" for resources.
+          items:
+            type: string
+            description: A field path that is computed at deploy time.
+            example: spec.arn
         description:
           type: string
           description: A description of the resource.
@@ -3455,6 +3804,14 @@ components:
             a human-friendly display name for the resource.
           allOf:
             - $ref: "#/components/schemas/ResourceMetadataState"
+        systemMetadata:
+          type: object
+          description: |
+            System-generated metadata for the resource, separate from user-defined
+            blueprint metadata. This includes provenance information.
+          allOf:
+            - $ref: "#/components/schemas/SystemMetadataState"
+          nullable: true
         dependsOnResources:
           type: array
           description: The names of resources that this resource depends on in the blueprint.
@@ -3521,6 +3878,45 @@ components:
           description: Custom metadata for the resource.
           allOf:
             - $ref: "#/components/schemas/AnyValue"
+
+    SystemMetadataState:
+      type: object
+      description: |
+        System-generated metadata for a resource, separate from user-defined
+        blueprint metadata.
+      properties:
+        provenance:
+          type: object
+          description: Provenance information for the resource.
+          allOf:
+            - $ref: "#/components/schemas/ProvenanceState"
+          nullable: true
+
+    ProvenanceState:
+      type: object
+      description: Bluelink provenance information for a resource.
+      properties:
+        provisionedBy:
+          type: string
+          description: Marker indicating the resource was provisioned by Bluelink.
+          example: bluelink
+        deployEngineVersion:
+          type: string
+          description: Version of the deploy engine used.
+          example: 1.0.0
+        providerPluginId:
+          type: string
+          description: Identifier for the provider plugin (e.g., "newstack-cloud/aws").
+          example: newstack-cloud/aws
+        providerPluginVersion:
+          type: string
+          description: Version of the provider plugin.
+          example: 0.5.0
+        provisionedAt:
+          type: integer
+          format: int64
+          description: Unix timestamp when the resource was provisioned.
+          example: 1678901234
 
     ResourceCompletionDurations:
       type: object
@@ -3869,6 +4265,25 @@ components:
           prepareDuration: 10000.0
           totalDuration: 20000.0
 
+    BlueprintInstanceResponse:
+      type: object
+      description: |
+        Wrapper response for async blueprint instance operations (create, update, destroy).
+        Contains the instance data along with streaming metadata.
+      required:
+        - data
+      properties:
+        lastEventId:
+          type: string
+          description: |
+            The ID to use as the starting offset for SSE streaming.
+            Clients should pass this value as the `Last-Event-ID` header when
+            connecting to the stream endpoint to avoid missing events.
+            Omitted if no events have been generated yet.
+          example: 60d7c6c5-3984-42b9-a3c1-ae8a47a9bf55
+        data:
+          $ref: "#/components/schemas/BlueprintInstance"
+
     BlueprintInstanceExports:
       type: object
       description: |
@@ -4081,6 +4496,30 @@ components:
             type: string
             description: The reason why the link deployment has failed.
             example: The link could not be created because the IAM role does not exist.
+        resourceDataMappings:
+          type: object
+          description: |
+            Mappings of resource spec fields to link data fields created when updating
+            intermediary resources. Format: "{resourceName}::{fieldPath}" -> "{linkDataFieldPath}".
+            Useful for applying link data projections to resources to take link changes
+            into account when checking for drift.
+          additionalProperties:
+            type: string
+          example:
+            "orderServiceRole::spec.policy.name": "orderServiceRole.policy"
+        drifted:
+          type: boolean
+          description: |
+            If true, the link has drifted from the current state stored in the Deploy Engine.
+            This includes drift in resource fields managed via ResourceDataMappings and
+            intermediary resources.
+          example: false
+          nullable: true
+        lastDriftDetectedTimestamp:
+          type: integer
+          description: The unix timestamp when the link was last detected to be drifted.
+          example: 1678901234
+          nullable: true
         durations:
           type: object
           description: Duration information for the latest deployment of the link.
@@ -4103,6 +4542,10 @@ components:
           type: string
           description: The ID of the intermediary resource.
           example: 60d7c6c5-3984-42b9-a3c1-ae8a47a9bf55
+        type:
+          type: string
+          description: The type of the intermediary resource.
+          example: aws/iam/role-policy
         instanceId:
           type: string
           description: The ID of the blueprint instance that the intermediary resource belongs to.
@@ -4205,6 +4648,11 @@ components:
             This will only be present if the link has reached intermediary resources updated status.
           allOf:
             - $ref: "#/components/schemas/LinkComponentCompletionDurations"
+          nullable: true
+        totalDuration:
+          type: number
+          description: The duration in milliseconds for the link change to reach the final status.
+          example: 30000.0
           nullable: true
 
     LinkComponentCompletionDurations:

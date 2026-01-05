@@ -23,7 +23,8 @@ _openapi:
           - **update_status**: Update the status only without modifying
           persisted state data
 
-          - **mark_failed**: Mark the element as failed
+          - **manual_cleanup_required**: Mark the element as requiring manual
+          cleanup
 
 
           This endpoint should be called after `checkReconciliation` to apply
@@ -40,7 +41,7 @@ and links in a blueprint instance.
 Actions can:
 - **accept_external**: Accept external cloud state as truth and update persisted state to match
 - **update_status**: Update the status only without modifying persisted state data
-- **mark_failed**: Mark the element as failed
+- **manual_cleanup_required**: Mark the element as requiring manual cleanup
 
 This endpoint should be called after `checkReconciliation` to apply the recommended
 or user-chosen actions for each element that needs reconciliation.

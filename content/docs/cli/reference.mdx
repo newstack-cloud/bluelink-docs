@@ -1,5 +1,5 @@
 ---
-title: Reference
+title: CLI Reference
 description: The reference for the available commands and flags for the Bluelink CLI
 ---
 
@@ -363,7 +363,8 @@ where `{scheme}` is one of the following: `s3`, `gcs`, `azureblob`.
 **Default Value**: `false`
 
 If true, the change set will be created for a destroy operation.
-This will only be used if the `--instance-id` or `--instance-name` flags are provided.
+
+This option is only relevant for existing blueprint instances. It will only be used if the `--instance-id` or `--instance-name` flags are provided. In interactive mode (when neither flag is provided), the destroy prompt will only appear if you enter an instance name that corresponds to an existing deployment.
 
 ### `--skip-drift-check`
 
@@ -382,6 +383,8 @@ to detect any out-of-band changes made outside of the deploy engine.
 Skipping drift checks can be useful when you are certain no external changes have been made
 or when you want to speed up the staging process for large deployments.
 
+This option is only relevant for existing blueprint instances. It will only be used if the `--instance-id` or `--instance-name` flags are provided. In interactive mode (when neither flag is provided), the skip drift check prompt will only appear if you enter an instance name that corresponds to an existing deployment.
+
 ### `--json`
 
 **Environment Variable**: `BLUELINK_CLI_STAGE_JSON`
@@ -399,6 +402,8 @@ When enabled, JSON mode implies non-interactive mode (no TUI, no streaming text 
 The output includes the change set ID, instance information, the full set of changes, and a summary of the changes.
 
 If drift is detected during staging, the JSON output will include drift information and reconciliation details.
+
+See the [JSON Output Reference](/docs/cli/json-output#stage-command) for detailed examples of the JSON output format.
 
 ## `deploy`
 
@@ -533,6 +538,8 @@ change set will be deployed.
 
 Note that the CLI automatically detects non-interactive environments, so this flag is typically only needed when running in an interactive terminal where you want to bypass the change set confirmation.
 
+When `--json` is enabled, `--auto-approve` is implied and does not need to be explicitly set.
+
 ### `--auto-rollback`
 
 **Environment Variable**: `BLUELINK_CLI_DEPLOY_AUTO_ROLLBACK`
@@ -547,24 +554,6 @@ If true, the deployment will automatically roll back to the previous state if th
 When enabled, the CLI will automatically initiate a rollback operation without requiring manual intervention.
 
 If you prefer to review failures before rolling back, leave this flag disabled and use the `rollback` command manually after inspecting the failure.
-
-### `--as-rollback`
-
-**Environment Variable**: `BLUELINK_CLI_DEPLOY_AS_ROLLBACK`
-
-**Configuration Key**: `deployAsRollback`
-
-**Type**: `boolean`
-
-**Default Value**: `false`
-
-Set this flag to indicate that the current deployment action is intended to be a rollback for a previous action.
-This is used when manually rolling back a previously deployed or destroyed blueprint instance.
-It signals to the deploy engine that this deployment is a "restoration" of a previously destroyed instance
-or a rollback to a previous state of a blueprint instance.
-
-This flag is typically set automatically when using the `rollback` command, but can be set manually
-when using the `deploy` command directly for rollback scenarios.
 
 ### `--force`
 
@@ -583,7 +572,11 @@ This is an escape hatch for recovering from stuck states where the blueprint ins
 When used in combination with `--stage`, this flag will also skip drift checks during the change staging process.
 
 <Callout title="Caution" type="error">
-Use this flag with care. Only use this when you are certain the instance is in a stuck state and no other deployment process is running.
+Use this flag with care. Only use this when you are certain the instance is in a stuck state and no other deployment process is _actively_ running.
+</Callout>
+
+<Callout title="Note" type="info">
+This option is only available as a command-line flag, environment variable, or configuration file setting. There is no interactive prompt for this option.
 </Callout>
 
 ### `--skip-prompts`
@@ -625,8 +618,10 @@ Output the result as a single JSON object when the operation completes.
 This is useful for CI/CD pipelines and programmatic tooling consumption.
 
 When enabled, JSON mode implies non-interactive mode (no TUI, no streaming text output).
-The output includes the full blueprint instance state with resource IDs, exports, child blueprints, and deployment status.
+The output includes the full blueprint instance state along with additional metadata.
 On failure, the output includes failure reasons and rollback status if applicable.
+
+See the [JSON Output Reference](/docs/cli/json-output#deploy-command) for detailed examples of the JSON output format.
 
 ## `destroy`
 
@@ -757,24 +752,7 @@ This is only effective if the `--stage` flag is set.
 
 Note that the CLI automatically detects non-interactive environments, so this flag is typically only needed when running in an interactive terminal where you want to bypass the change set confirmation.
 
-### `--as-rollback`
-
-**Environment Variable**: `BLUELINK_CLI_DESTROY_AS_ROLLBACK`
-
-**Configuration Key**: `destroyAsRollback`
-
-**Type**: `boolean`
-
-**Default Value**: `false`
-
-Set this flag to indicate that the current destroy action is intended to be a rollback for a previous action.
-This is used when manually rolling back a previously deployed blueprint instance.
-It signals to the deploy engine that this destroy operation is a rollback to a previous state where the current blueprint instance
-was deployed successfully but another part of the deployment failed. This typically happens when the current blueprint instance
-is a child of another blueprint instance that failed to deploy.
-
-This flag is typically set automatically when using the `rollback` command, but can be set manually
-when using the `destroy` command directly for rollback scenarios.
+When `--json` is enabled, `--auto-approve` is implied and does not need to be explicitly set.
 
 ### `--force`
 
@@ -800,6 +778,10 @@ When using `--force`, the destroy process will:
 
 Only use this flag as a last resort when you have verified that the underlying resources have already been removed
 or when you accept the risk of orphaned resources that may incur ongoing costs.
+</Callout>
+
+<Callout title="Note" type="info">
+This option is only available as a command-line flag, environment variable, or configuration file setting. There is no interactive prompt for this option.
 </Callout>
 
 ### `--skip-prompts`
@@ -843,6 +825,8 @@ This is useful for CI/CD pipelines and programmatic tooling consumption.
 When enabled, JSON mode implies non-interactive mode (no TUI, no streaming text output).
 The output includes the destroy operation status and summary details.
 On failure, the output includes failure reasons.
+
+See the [JSON Output Reference](/docs/cli/json-output#destroy-command) for detailed examples of the JSON output format.
 
 ## `instances`
 
@@ -931,6 +915,12 @@ Inspecting a pre-selected instance by ID:
 bluelink instances inspect --instance-id a471bbb8-1267-4e65-873b-fa86bca71fcf
 ```
 
+Inspecting a pre-selected instance as JSON:
+
+```bash
+bluelink instances inspect --json --instance-name order-stack
+```
+
 #### `--instance-name`
 
 **Environment Variable**: `BLUELINK_CLI_INSTANCES_INSPECT_INSTANCE_NAME`
@@ -953,89 +943,21 @@ This should be left empty if the `--instance-id` flag is provided.
 The generated ID of the blueprint instance to inspect.
 This should be left empty if the `--instance-name` flag is provided.
 
-## `rollback`
+#### `--json`
 
-This command is used to manually roll back a failed deployment or update to a blueprint instance.
+**Environment Variable**: `BLUELINK_CLI_INSTANCES_INSPECT_JSON`
 
-Use this command when you have not opted into `--auto-rollback` on the `deploy` command and need to manually
-initiate a rollback after inspecting a deployment failure.
-
-Run the command without any flags and go through the interactive prompts to roll back a blueprint instance:
-
-```bash
-bluelink rollback
-```
-
-Rolling back a pre-selected instance:
-
-```bash
-bluelink rollback --instance-name order-stack
-```
-
-Rolling back with a specific blueprint file:
-
-```bash
-bluelink rollback --instance-name order-stack --blueprint-file ./project.blueprint.yaml
-```
-
-Rolling back without manually approving the rollback change set:
-
-```bash
-bluelink rollback --instance-name order-stack --blueprint-file ./project.blueprint.yaml --auto-approve
-```
-
-### `--instance-name`
-
-**Environment Variable**: `BLUELINK_CLI_ROLLBACK_INSTANCE_NAME`
-
-**Configuration Key**: `rollbackInstanceName`
-
-**Type**: `string`
-
-The user-defined unique name of the blueprint instance to roll back.
-This should be left empty if the `--instance-id` flag is provided.
-
-### `--instance-id`
-
-**Environment Variable**: `BLUELINK_CLI_ROLLBACK_INSTANCE_ID`
-
-**Configuration Key**: `rollbackInstanceId`
-
-**Type**: `string`
-
-The generated ID of the blueprint instance to roll back.
-This should be left empty if the `--instance-name` flag is provided.
-
-### `--blueprint-file`
-
-**Environment Variable**: `BLUELINK_CLI_ROLLBACK_BLUEPRINT_FILE`
-
-**Configuration Key**: `rollbackBlueprintFile`
-
-**Type**: `string`
-
-**Default Value**: `project.blueprint.yaml`
-
-The blueprint file to use for the rollback operation.
-This can be a local file, a public URL or a path to a file in an object storage bucket.
-Local files can be specified as a relative or absolute path to the file.
-Public URLs must start with `https://` and represent a valid URL to a blueprint file.
-Object storage bucket files must be specified in the format of `{scheme}://{bucket-name}/{object-path}`,
-where `{scheme}` is one of the following: `s3`, `gcs`, `azureblob`.
-
-### `--auto-approve`
-
-**Environment Variable**: `BLUELINK_CLI_ROLLBACK_AUTO_APPROVE`
-
-**Configuration Key**: `rollbackAutoApprove`
+**Configuration Key**: `instancesInspectJson`
 
 **Type**: `boolean`
 
 **Default Value**: `false`
 
-If true, the rollback command will automatically approve and execute the rollback without prompting for confirmation.
+Output the result as a single JSON object.
+This is useful for CI/CD pipelines and programmatic tooling consumption.
 
-Note that the CLI automatically detects non-interactive environments, so this flag is typically only needed when running in an interactive terminal where you want to bypass the rollback confirmation.
+When enabled, JSON mode implies non-interactive mode.
+The output includes the full blueprint instance state with resources, links, child blueprints, exports and deployment status.
 
 ## `state`
 
@@ -1170,6 +1092,137 @@ The same mechanism that is used for resolving remote blueprint file locations is
 <Callout title="Remote Storage Credentials" type="warning">
 Credentials for remote object storage buckets are derived from the current environment as per the standard SDK
 mechanisms for each cloud provider.
+</Callout>
+
+## `cleanup`
+
+`bluelink cleanup [options]`
+
+This command triggers cleanup of temporary resources in the deploy engine that have exceeded their configured retention periods.
+The deploy engine stores temporary data such as validation results, change sets, reconciliation results, and streaming events
+for a configurable period to support operations like event replay and debugging.
+
+Running cleanup manually can be useful to free up storage space or to ensure old data is removed
+before a scheduled cleanup would normally occur.
+
+<Callout title="Note" type="info">
+Cleanup operations run asynchronously in the background. The command returns immediately after
+triggering the cleanup process. The actual cleanup may take several minutes to complete depending
+on the amount of data to be removed.
+</Callout>
+
+<Callout title="Remote Deploy Engine Support" type="info">
+Unlike commands such as `state import`, `state export`, and `plugins` subcommands that only work
+with a local deploy engine instance, the `cleanup` command works with both local and remote
+deploy engine instances. For remote instances, ensure the correct endpoint is set and that the correct credentials are configured
+in the [engine auth config file](/docs/cli/reference#--engine-auth-config-file).
+</Callout>
+
+Trigger cleanup of all supported resource types (default behavior):
+
+```bash
+bluelink cleanup
+```
+
+Trigger cleanup of specific resource types:
+
+```bash
+bluelink cleanup --validations --changesets
+```
+
+### `--validations`
+
+**Environment Variable**: `BLUELINK_CLI_CLEANUP_VALIDATIONS`
+
+**Configuration Key**: `cleanupValidations`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+Cleanup blueprint validation results that have exceeded their retention period.
+Validation results are created when running the `validate` command and are retained
+for debugging and auditing purposes.
+
+When no specific resource type flags are provided, all resource types are cleaned up by default.
+
+### `--changesets`
+
+**Environment Variable**: `BLUELINK_CLI_CLEANUP_CHANGESETS`
+
+**Configuration Key**: `cleanupChangesets`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+Cleanup change sets that have exceeded their retention period.
+Change sets are created during the `stage` command and contain the planned changes
+for a deployment. Old change sets that were never deployed or have already been applied
+are cleaned up.
+
+When no specific resource type flags are provided, all resource types are cleaned up by default.
+
+### `--reconciliation-results`
+
+**Environment Variable**: `BLUELINK_CLI_CLEANUP_RECONCILIATION_RESULTS`
+
+**Configuration Key**: `cleanupReconciliationResults`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+Cleanup reconciliation check results that have exceeded their retention period.
+Reconciliation results are created when checking for drift or interrupted state
+and are retained for review and debugging purposes.
+
+When no specific resource type flags are provided, all resource types are cleaned up by default.
+
+### `--events`
+
+**Environment Variable**: `BLUELINK_CLI_CLEANUP_EVENTS`
+
+**Configuration Key**: `cleanupEvents`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+Cleanup streaming events that have exceeded their retention period.
+Events are generated during validation, change staging, and deployment operations
+and are retained to support event replay via the `Last-Event-ID` header for SSE streams.
+
+When no specific resource type flags are provided, all resource types are cleaned up by default.
+
+### Scheduled Cleanup
+
+The deploy engine does not automatically clean up old data on a schedule. It is recommended that you set up
+a scheduled task (such as a cron job) to run the cleanup command at regular intervals.
+
+**Recommended frequency:**
+- **High-usage environments** (multiple deployments per day): Weekly cleanup
+- **Moderate-usage environments** (a few deployments per week): Monthly cleanup
+- **Low-usage environments** (occasional deployments): Quarterly cleanup or as needed
+
+If cleanup is not run regularly, storage usage will grow over time but there is no functional impact
+on the deploy engine. Old data simply accumulates until explicitly cleaned up.
+
+**Example cron entries:**
+
+Weekly cleanup (every Sunday at 2:00 AM):
+```bash
+0 2 * * 0 /usr/local/bin/bluelink cleanup
+```
+
+Monthly cleanup (first day of each month at 3:00 AM):
+```bash
+0 3 1 * * /usr/local/bin/bluelink cleanup
+```
+
+<Callout title="Tip" type="info">
+Adjust the path to the `bluelink` binary based on your installation. You can find the path by running
+`which bluelink` on Linux/macOS or `where bluelink` on Windows.
 </Callout>
 
 ## `plugins`
