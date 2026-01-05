@@ -716,7 +716,6 @@ When a deployment completes successfully, the output includes the full instance 
     "message": "Deployment failed"
   },
   "failureReasons": []
-  // Detailed failure information will be documented here
 }
 ```
 
@@ -1070,23 +1069,362 @@ When `--auto-rollback` is enabled and a deployment fails, the CLI will automatic
 
 ## Destroy Command
 
-The `bluelink destroy` command outputs JSON describing the destroy operation result.
-
-<Callout title="Coming Soon" type="info">
-Detailed JSON output examples for the destroy command will be added in a future update.
-</Callout>
+The `bluelink destroy` command outputs JSON describing the destroy operation result, including the pre-destroy state of the instance and a summary of all destroyed elements.
 
 ### Successful Destroy
+
+When a destroy operation completes successfully, the output includes the full pre-destroy state of the instance with all resources, child blueprints, and exports that were destroyed:
 
 ```json
 {
   "success": true,
-  "instanceId": "2fde4a0f-b236-4a34-9442-cd8232745854",
-  "instanceName": "my-stack",
-  "status": "destroyed",
-  "message": "Instance destroyed successfully"
+  "instanceId": "0182febe-6c12-46e7-a51d-e38268715be1",
+  "instanceName": "my-simple-app",
+  "changesetId": "ec35fa4a-ba2e-44ca-a00d-71a25eb1d370",
+  "status": "DESTROYED",
+  "preDestroyState": {
+    "id": "0182febe-6c12-46e7-a51d-e38268715be1",
+    "name": "my-simple-app",
+    "status": 2,
+    "lastStatusUpdateTimestamp": 1767616951,
+    "lastDeployedTimestamp": 1767616951,
+    "lastDeployAttemptTimestamp": 1767616951,
+    "resourceIds": {
+      "lambdaRole": "8c2fe9b0-0e5b-4558-a79c-c8ec6822928b",
+      "mainQueue": "25631a0a-ea5a-4f6b-a3b9-344828f6b2d9"
+    },
+    "resources": {
+      "25631a0a-ea5a-4f6b-a3b9-344828f6b2d9": {
+        "id": "25631a0a-ea5a-4f6b-a3b9-344828f6b2d9",
+        "name": "mainQueue",
+        "type": "aws/sqs/queue",
+        "instanceId": "0182febe-6c12-46e7-a51d-e38268715be1",
+        "status": 2,
+        "preciseStatus": 3,
+        "lastStatusUpdateTimestamp": 1767616950,
+        "lastDeployedTimestamp": 1767616950,
+        "lastDeployAttemptTimestamp": 1767616950,
+        "specData": {
+          "arn": "arn:aws:sqs:eu-west-2:027653366630:bluelink-simple-test-main-queue",
+          "messageRetentionPeriod": 86400,
+          "queueName": "bluelink-simple-test-main-queue",
+          "queueUrl": "https://sqs.eu-west-2.amazonaws.com/027653366630/bluelink-simple-test-main-queue",
+          "sqsManagedSseEnabled": true,
+          "tags": [
+            { "key": "Environment", "value": "test" },
+            { "key": "ManagedBy", "value": "bluelink" }
+          ],
+          "visibilityTimeout": 60
+        },
+        "computedFields": ["spec.queueUrl", "spec.arn"],
+        "metadata": {
+          "displayName": "Main Queue"
+        },
+        "failureReasons": null,
+        "durations": {
+          "configCompleteDuration": 118.912,
+          "totalDuration": 5127.511,
+          "attemptDurations": [118.912]
+        }
+      },
+      "8c2fe9b0-0e5b-4558-a79c-c8ec6822928b": {
+        "id": "8c2fe9b0-0e5b-4558-a79c-c8ec6822928b",
+        "name": "lambdaRole",
+        "type": "aws/iam/role",
+        "instanceId": "0182febe-6c12-46e7-a51d-e38268715be1",
+        "status": 2,
+        "preciseStatus": 3,
+        "lastStatusUpdateTimestamp": 1767616951,
+        "lastDeployedTimestamp": 1767616951,
+        "lastDeployAttemptTimestamp": 1767616951,
+        "specData": {
+          "arn": "arn:aws:iam::027653366630:role/bluelink-simple-test-role",
+          "assumeRolePolicyDocument": {
+            "Statement": [
+              {
+                "Action": ["sts:AssumeRole"],
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": ["lambda.amazonaws.com"]
+                }
+              }
+            ],
+            "Version": "2012-10-17"
+          },
+          "description": "Role for test environment",
+          "managedPolicyArns": [
+            "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+          ],
+          "roleId": "AROAQM4CE4NTM7JDAP6JR",
+          "roleName": "bluelink-simple-test-role",
+          "tags": [
+            { "key": "Environment", "value": "test" },
+            { "key": "ManagedBy", "value": "bluelink" }
+          ]
+        },
+        "computedFields": ["spec.arn", "spec.roleId"],
+        "metadata": {
+          "displayName": "Lambda Role"
+        },
+        "failureReasons": null,
+        "durations": {
+          "configCompleteDuration": 680.151,
+          "totalDuration": 5682.24,
+          "attemptDurations": [680.151]
+        }
+      }
+    },
+    "links": {},
+    "metadata": null,
+    "exports": {
+      "mainQueueUrl": {
+        "value": "https://sqs.eu-west-2.amazonaws.com/027653366630/bluelink-simple-test-main-queue",
+        "type": "string",
+        "field": "resources.mainQueue.spec.queueUrl"
+      },
+      "roleArn": {
+        "value": "arn:aws:iam::027653366630:role/bluelink-simple-test-role",
+        "type": "string",
+        "field": "resources.lambdaRole.spec.arn"
+      }
+    },
+    "childBlueprints": {
+      "child": {
+        "id": "5cc9a174-4629-4ee1-97dc-1c78e48b7acc",
+        "name": "my-simple-app-child",
+        "status": 2,
+        "lastStatusUpdateTimestamp": 1767616950,
+        "lastDeployedTimestamp": 1767616950,
+        "lastDeployAttemptTimestamp": 1767616950,
+        "resourceIds": {
+          "childQueue": "0dfd8f77-3dda-433f-987f-545e4d5a6554"
+        },
+        "resources": {
+          "0dfd8f77-3dda-433f-987f-545e4d5a6554": {
+            "id": "0dfd8f77-3dda-433f-987f-545e4d5a6554",
+            "name": "childQueue",
+            "type": "aws/sqs/queue",
+            "instanceId": "5cc9a174-4629-4ee1-97dc-1c78e48b7acc",
+            "status": 2,
+            "preciseStatus": 3,
+            "lastStatusUpdateTimestamp": 1767616950,
+            "lastDeployedTimestamp": 1767616950,
+            "lastDeployAttemptTimestamp": 1767616950,
+            "specData": {
+              "arn": "arn:aws:sqs:eu-west-2:027653366630:bluelink-simple-test-child-queue",
+              "messageRetentionPeriod": 86400,
+              "queueName": "bluelink-simple-test-child-queue",
+              "queueUrl": "https://sqs.eu-west-2.amazonaws.com/027653366630/bluelink-simple-test-child-queue",
+              "sqsManagedSseEnabled": true,
+              "tags": [
+                { "key": "Purpose", "value": "child" },
+                { "key": "ManagedBy", "value": "bluelink" }
+              ],
+              "visibilityTimeout": 60
+            },
+            "computedFields": ["spec.arn", "spec.queueUrl"],
+            "metadata": {
+              "displayName": "Child Queue"
+            },
+            "failureReasons": null,
+            "durations": {
+              "configCompleteDuration": 138.821,
+              "totalDuration": 5139.581,
+              "attemptDurations": [138.821]
+            }
+          }
+        },
+        "links": {},
+        "metadata": null,
+        "exports": {
+          "childQueueUrl": {
+            "value": "https://sqs.eu-west-2.amazonaws.com/027653366630/bluelink-simple-test-child-queue",
+            "type": "string",
+            "field": "resources.childQueue.spec.queueUrl"
+          }
+        },
+        "childBlueprints": null,
+        "durations": {
+          "prepareDuration": 4.266,
+          "totalDuration": 5158.134
+        }
+      }
+    },
+    "childDependencies": {
+      "child": {}
+    },
+    "durations": {
+      "prepareDuration": 2.702,
+      "totalDuration": 5702.281
+    }
+  },
+  "summary": {
+    "destroyed": 4,
+    "failed": 0,
+    "interrupted": 0,
+    "elements": [
+      {
+        "name": "lambdaRole",
+        "path": "resources.lambdaRole",
+        "type": "aws/iam/role",
+        "status": "destroyed"
+      },
+      {
+        "name": "mainQueue",
+        "path": "resources.mainQueue",
+        "type": "aws/sqs/queue",
+        "status": "destroyed"
+      },
+      {
+        "name": "child",
+        "path": "children.child",
+        "type": "child",
+        "status": "destroyed"
+      },
+      {
+        "name": "childQueue",
+        "path": "children.child::resources.childQueue",
+        "type": "aws/sqs/queue",
+        "status": "destroyed"
+      }
+    ]
+  }
 }
 ```
+
+#### Destroy Output Fields
+
+| Field | Description |
+|-------|-------------|
+| `success` | Whether the destroy operation completed successfully |
+| `instanceId` | The unique identifier of the destroyed blueprint instance |
+| `instanceName` | The user-defined name of the blueprint instance |
+| `changesetId` | The ID of the changeset for the destroy operation |
+| `status` | The destroy status (`DESTROYED`, `DESTROY_FAILED`) |
+| `preDestroyState` | The complete state of the blueprint instance before destruction |
+| `preDestroyState.resources` | Map of resource IDs to their state before destruction including `specData` |
+| `preDestroyState.exports` | The export values from the blueprint before destruction |
+| `preDestroyState.childBlueprints` | Nested child blueprint instances with their own resources and exports |
+| `preDestroyState.durations` | Timing information from the original deployment |
+| `summary.destroyed` | Count of successfully destroyed elements |
+| `summary.failed` | Count of elements that failed to destroy |
+| `summary.interrupted` | Count of interrupted elements |
+| `summary.elements` | Array of all destroyed elements with their status |
+| `summary.elements[].name` | The logical name of the element |
+| `summary.elements[].path` | The path to the element (e.g., `resources.lambdaRole`, `children.child::resources.childQueue`) |
+| `summary.elements[].type` | The resource type or `child` for child blueprints |
+| `summary.elements[].status` | The element's status after destroy (`destroyed`, `failed`, `interrupted`) |
+
+### Destroy Drift Detected
+
+When drift is detected during a destroy operation, the CLI returns a drift response indicating that external changes have been made to resources and reconciliation is required before the destroy can proceed.
+
+```json
+{
+  "success": true,
+  "driftDetected": true,
+  "instanceId": "c663fa79-f15a-48b0-a5c7-09c6a68096f2",
+  "instanceName": "my-simple-app",
+  "message": "Drift detected. External changes to resources require reconciliation before staging changes.",
+  "reconciliation": {
+    "instanceId": "c663fa79-f15a-48b0-a5c7-09c6a68096f2",
+    "resources": [
+      {
+        "resourceId": "732244dc-2e24-42fb-9fd4-17af7e8ad5bd",
+        "resourceName": "mainQueue",
+        "resourceType": "aws/sqs/queue",
+        "type": "drift",
+        "oldStatus": 3,
+        "newStatus": 3,
+        "externalState": {
+          "arn": "arn:aws:sqs:eu-west-2:027653366630:bluelink-simple-test-main-queue",
+          "messageRetentionPeriod": 86400,
+          "queueName": "bluelink-simple-test-main-queue",
+          "queueUrl": "https://sqs.eu-west-2.amazonaws.com/027653366630/bluelink-simple-test-main-queue",
+          "sqsManagedSseEnabled": true,
+          "tags": [
+            { "key": "Environment", "value": "test" },
+            { "key": "ManagedBy", "value": "bluelink" }
+          ],
+          "visibilityTimeout": 60
+        },
+        "persistedState": {
+          "arn": "arn:aws:sqs:eu-west-2:027653366630:bluelink-simple-test-main-queue",
+          "messageRetentionPeriod": 86400,
+          "queueName": "bluelink-simple-test-main-queue",
+          "queueUrl": "https://sqs.eu-west-2.amazonaws.com/027653366630/bluelink-simple-test-main-queue",
+          "sqsManagedSseEnabled": true,
+          "tags": [
+            { "key": "Environment", "value": "test" },
+            { "key": "ManagedBy", "value": "bluelink" }
+          ],
+          "visibilityTimeout": 60
+        },
+        "changes": {
+          "appliedResourceInfo": {
+            "resourceId": "",
+            "resourceName": "",
+            "instanceId": "",
+            "currentResourceState": null,
+            "resourceWithResolvedSubs": null
+          },
+          "mustRecreate": false,
+          "modifiedFields": [
+            {
+              "fieldPath": "spec.visibilityTimeout",
+              "prevValue": 60,
+              "newValue": 120,
+              "mustRecreate": false,
+              "sensitive": false
+            }
+          ],
+          "newFields": null,
+          "removedFields": null,
+          "unchangedFields": null,
+          "computedFields": null,
+          "fieldChangesKnownOnDeploy": null,
+          "conditionKnownOnDeploy": false,
+          "newOutboundLinks": null,
+          "outboundLinkChanges": null,
+          "removedOutboundLinks": null
+        },
+        "resourceExists": true,
+        "recommendedAction": "accept_external"
+      }
+    ],
+    "links": [],
+    "hasInterrupted": false,
+    "hasDrift": true,
+    "hasChildIssues": false
+  }
+}
+```
+
+#### Destroy Drift Fields
+
+| Field | Description |
+|-------|-------------|
+| `driftDetected` | `true` when drift has been detected during the destroy staging phase |
+| `message` | Human-readable message explaining that reconciliation is required |
+| `reconciliation` | The full reconciliation check result with drift details |
+| `reconciliation.instanceId` | The ID of the blueprint instance with drift |
+| `reconciliation.resources` | Array of resources with drift or interrupted state |
+| `reconciliation.resources[].resourceId` | The unique identifier of the drifted resource |
+| `reconciliation.resources[].resourceName` | The logical name of the resource in the blueprint |
+| `reconciliation.resources[].resourceType` | The type of the resource (e.g., `aws/sqs/queue`) |
+| `reconciliation.resources[].type` | Type of issue: `drift` or `interrupted` |
+| `reconciliation.resources[].oldStatus` | The previous status of the resource (integer status code) |
+| `reconciliation.resources[].newStatus` | The new/current status of the resource (integer status code) |
+| `reconciliation.resources[].externalState` | Current state of the resource in the external system |
+| `reconciliation.resources[].persistedState` | State stored in the deploy engine |
+| `reconciliation.resources[].changes` | Detailed field-level changes between blueprint and external state |
+| `reconciliation.resources[].changes.modifiedFields` | Array of fields that have different values |
+| `reconciliation.resources[].resourceExists` | Whether the resource exists in the external system |
+| `reconciliation.resources[].recommendedAction` | Suggested action: `accept_external`, `update_status`, or `manual_cleanup_required` |
+| `reconciliation.links` | Array of links with drift |
+| `reconciliation.hasInterrupted` | Whether any resources are in interrupted state |
+| `reconciliation.hasDrift` | Whether drift was detected in any resources |
+| `reconciliation.hasChildIssues` | Whether issues exist in child blueprints |
 
 ### Destroy Failed
 
@@ -1101,7 +1439,6 @@ Detailed JSON output examples for the destroy command will be added in a future 
     "message": "Destroy operation failed"
   },
   "failureReasons": []
-  // Detailed failure information will be documented here
 }
 ```
 
