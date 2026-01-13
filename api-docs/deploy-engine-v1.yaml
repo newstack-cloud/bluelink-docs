@@ -356,6 +356,54 @@ paths:
         - oauth_jwt: []
         - api_key: []
 
+  /validations/cleanup/{id}:
+    get:
+      tags:
+        - Validation
+      summary: Get Blueprint Validations Cleanup Status
+      description: |
+        Get the status of a blueprint validations cleanup operation.
+        Use this endpoint to poll for the completion of a cleanup operation
+        that was started using the `cleanUpBlueprintValidations` endpoint.
+      operationId: getBlueprintValidationsCleanupStatus
+      parameters:
+        - $ref: "#/components/parameters/cleanupOperationIdParam"
+        - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+      responses:
+        "200":
+          description: Cleanup operation status retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CleanupOperation"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestError"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorisedError"
+        "404":
+          description: Cleanup operation not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotFoundError"
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnexpectedError"
+      security:
+        - oauth_jwt: []
+        - api_key: []
+
   /deployments/changes:
     post:
       tags:
@@ -604,6 +652,54 @@ paths:
         - oauth_jwt: []
         - api_key: []
 
+  /deployments/changes/cleanup/{id}:
+    get:
+      tags:
+        - Deployments
+      summary: Get Change Sets Cleanup Status
+      description: |
+        Get the status of a change sets cleanup operation.
+        Use this endpoint to poll for the completion of a cleanup operation
+        that was started using the `cleanUpChangeSets` endpoint.
+      operationId: getChangeSetsCleanupStatus
+      parameters:
+        - $ref: "#/components/parameters/cleanupOperationIdParam"
+        - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+      responses:
+        "200":
+          description: Cleanup operation status retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CleanupOperation"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestError"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorisedError"
+        "404":
+          description: Cleanup operation not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotFoundError"
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnexpectedError"
+      security:
+        - oauth_jwt: []
+        - api_key: []
+
   /deployments/reconciliation-results/cleanup:
     post:
       tags:
@@ -645,7 +741,122 @@ paths:
         - oauth_jwt: []
         - api_key: []
 
+  /deployments/reconciliation-results/cleanup/{id}:
+    get:
+      tags:
+        - Deployments
+      summary: Get Reconciliation Results Cleanup Status
+      description: |
+        Get the status of a reconciliation results cleanup operation.
+        Use this endpoint to poll for the completion of a cleanup operation
+        that was started using the `cleanUpReconciliationResults` endpoint.
+      operationId: getReconciliationResultsCleanupStatus
+      parameters:
+        - $ref: "#/components/parameters/cleanupOperationIdParam"
+        - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+      responses:
+        "200":
+          description: Cleanup operation status retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CleanupOperation"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestError"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorisedError"
+        "404":
+          description: Cleanup operation not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotFoundError"
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnexpectedError"
+      security:
+        - oauth_jwt: []
+        - api_key: []
+
   /deployments/instances:
+    get:
+      tags:
+        - Deployments
+      summary: List Blueprint Instances
+      description: |
+        Retrieve a paginated list of blueprint instances.
+        Results can be filtered by name using case-insensitive substring matching
+        and paginated using offset and limit parameters.
+      operationId: listBlueprintInstances
+      parameters:
+        - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+          description: |
+            Filter instances by name using case-insensitive substring matching.
+            Only instances whose names contain the search term will be returned.
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: |
+            The number of items to skip for pagination.
+            Use with `limit` to paginate through results.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: |
+            The maximum number of items to return.
+            Set to 0 or omit to return all matching instances.
+      responses:
+        "200":
+          description: Successfully retrieved the list of blueprint instances.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBlueprintInstancesResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestError"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorisedError"
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnexpectedError"
+      security:
+        - oauth_jwt: []
+        - api_key: []
     post:
       tags:
         - Deployments
@@ -1192,7 +1403,7 @@ paths:
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
       responses:
         "202":
-          description: Change set cleanup has been started.
+          description: Events cleanup has been started.
           content:
             application/json:
               schema:
@@ -1219,6 +1430,54 @@ paths:
         - oauth_jwt: []
         - api_key: []
 
+  /events/cleanup/{id}:
+    get:
+      tags:
+        - Events
+      summary: Get Events Cleanup Status
+      description: |
+        Get the status of an events cleanup operation.
+        Use this endpoint to poll for the completion of a cleanup operation
+        that was started using the `cleanUpEvents` endpoint.
+      operationId: getEventsCleanupStatus
+      parameters:
+        - $ref: "#/components/parameters/cleanupOperationIdParam"
+        - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+      responses:
+        "200":
+          description: Cleanup operation status retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CleanupOperation"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestError"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorisedError"
+        "404":
+          description: Cleanup operation not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotFoundError"
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnexpectedError"
+      security:
+        - oauth_jwt: []
+        - api_key: []
+
 components:
   parameters:
     bluelinkSignatureV1Param:
@@ -1226,11 +1485,19 @@ components:
       in: header
       description: |
         The Bluelink Signature v1 authentication mechanism can be used to authenticate requests to the Deploy Engine.
-        See the [Bluelink Signature v1](/docs/auth/signature-v1) documentation for more information on how to use this authentication mechanism.
+        See the [Bluelink Signature v1](/docs/bluelink/auth/signature-v1) documentation for more information on how to use this authentication mechanism.
         This is not required if the request is authenticated using an OAuth2/OIDC-issued JWT or an API key.
       required: false
       schema:
         type: string
+    cleanupOperationIdParam:
+      name: id
+      in: path
+      required: true
+      description: The unique identifier of the cleanup operation
+      schema:
+        type: string
+        format: uuid
   schemas:
     BlueprintValidationPayload:
       type: object
@@ -4046,6 +4313,102 @@ components:
           additionalProperties:
             $ref: "#/components/schemas/FieldChange"
 
+    ListBlueprintInstancesResponse:
+      type: object
+      required:
+        - instances
+        - totalCount
+      properties:
+        instances:
+          type: array
+          description: The list of blueprint instance summaries for the current page.
+          items:
+            $ref: "#/components/schemas/BlueprintInstanceSummary"
+        totalCount:
+          type: integer
+          description: |
+            The total number of instances matching the filter criteria before pagination.
+            Use this value to calculate the total number of pages for pagination UI.
+          example: 42
+
+    BlueprintInstanceSummary:
+      type: object
+      required:
+        - id
+        - name
+        - status
+        - lastDeployedTimestamp
+      properties:
+        id:
+          type: string
+          description: The unique identifier of the blueprint instance.
+          example: 16ef8989-af00-4a4a-8164-72493ceb1aa0
+        name:
+          type: string
+          description: The user-defined name of the blueprint instance.
+          example: my-app-production
+        status:
+          type: string
+          description: |
+            The current deployment status of the instance.
+
+            The following status values are supported:
+
+            - `PREPARING` - The instance is being prepared to be deployed, updated or destroyed.
+            - `DEPLOYING` - An initial blueprint deployment is in progress.
+            - `DEPLOYED` - The instance has been deployed successfully.
+            - `DEPLOY FAILED` - The first deployment of the instance failed.
+            - `DEPLOY ROLLING BACK` - The instance deployment has failed and is being rolled back.
+            - `DEPLOY ROLLBACK FAILED` - The instance deployment rollback has failed.
+            - `DEPLOY ROLLBACK COMPLETE` - The instance deployment has been successfully rolled back.
+            - `DESTROYING` - The instance is being destroyed.
+            - `DESTROYED` - The instance has been destroyed.
+            - `DESTROY FAILED` - The destruction of the instance has failed.
+            - `DESTROY ROLLING BACK` - The instance destruction has failed and is being rolled back.
+            - `DESTROY ROLLBACK FAILED` - The instance destruction rollback has failed.
+            - `DESTROY ROLLBACK COMPLETE` - The instance destruction has been successfully rolled back.
+            - `UPDATING` - The instance is being updated.
+            - `UPDATED` - The instance has been successfully updated.
+            - `UPDATE FAILED` - The instance update has failed.
+            - `UPDATE ROLLING BACK` - The instance update has failed and is being rolled back.
+            - `UPDATE ROLLBACK FAILED` - The instance update rollback has failed.
+            - `UPDATE ROLLBACK COMPLETE` - The instance update has been successfully rolled back.
+            - `NOT DEPLOYED` - The instance has not had its first deployment.
+            - `DEPLOY INTERRUPTED` - The instance deployment was interrupted.
+            - `UPDATE INTERRUPTED` - The instance update was interrupted.
+            - `DESTROY INTERRUPTED` - The instance destruction was interrupted.
+          example: DEPLOYED
+          enum:
+            - PREPARING
+            - DEPLOYING
+            - DEPLOYED
+            - DEPLOY FAILED
+            - DEPLOY ROLLING BACK
+            - DEPLOY ROLLBACK FAILED
+            - DEPLOY ROLLBACK COMPLETE
+            - DESTROYING
+            - DESTROYED
+            - DESTROY FAILED
+            - DESTROY ROLLING BACK
+            - DESTROY ROLLBACK FAILED
+            - DESTROY ROLLBACK COMPLETE
+            - UPDATING
+            - UPDATED
+            - UPDATE FAILED
+            - UPDATE ROLLING BACK
+            - UPDATE ROLLBACK FAILED
+            - UPDATE ROLLBACK COMPLETE
+            - NOT DEPLOYED
+            - DEPLOY INTERRUPTED
+            - UPDATE INTERRUPTED
+            - DESTROY INTERRUPTED
+        lastDeployedTimestamp:
+          type: integer
+          description: |
+            The unix timestamp (in seconds) of when the instance was last deployed.
+            This value is 0 if the instance has never been successfully deployed.
+          example: 1700000000
+
     BlueprintInstance:
       type: object
       required:
@@ -4752,12 +5115,86 @@ components:
 
     CleanupStartedResponse:
       type: object
+      description: |
+        Response returned when a cleanup operation is started.
+        The operation runs asynchronously and its status can be polled
+        using the corresponding GET endpoint.
       required:
-        - message
+        - data
       properties:
-        message:
+        data:
+          $ref: "#/components/schemas/CleanupOperation"
+
+    CleanupOperation:
+      type: object
+      description: |
+        Represents a cleanup operation that removes old data based on configured
+        retention periods. Cleanup operations run asynchronously and can be polled
+        for status.
+      required:
+        - id
+        - cleanupType
+        - status
+        - startedAt
+        - thresholdDate
+      properties:
+        id:
           type: string
-          example: Cleanup started
+          format: uuid
+          description: Unique identifier for the cleanup operation
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        cleanupType:
+          $ref: "#/components/schemas/CleanupType"
+        status:
+          $ref: "#/components/schemas/CleanupOperationStatus"
+        startedAt:
+          type: integer
+          format: int64
+          description: Unix timestamp (seconds) when the operation started
+          example: 1678901234
+        endedAt:
+          type: integer
+          format: int64
+          description: |
+            Unix timestamp (seconds) when the operation ended.
+            Will be 0 if the operation is still running.
+          example: 1678901334
+        itemsDeleted:
+          type: integer
+          format: int64
+          description: Number of items deleted by the cleanup operation
+          example: 150
+        errorMessage:
+          type: string
+          description: Error message if the operation failed
+          example: "Database connection timeout"
+        thresholdDate:
+          type: integer
+          format: int64
+          description: |
+            Unix timestamp (seconds) representing the cutoff date.
+            Items older than this date were eligible for cleanup based on
+            the configured retention period.
+          example: 1676309234
+
+    CleanupType:
+      type: string
+      description: The type of cleanup operation
+      enum:
+        - events
+        - changesets
+        - reconciliation_results
+        - validations
+      example: changesets
+
+    CleanupOperationStatus:
+      type: string
+      description: The current status of the cleanup operation
+      enum:
+        - running
+        - completed
+        - failed
+      example: completed
 
     BlueprintLocationMetadata:
       type: object

@@ -888,6 +888,8 @@ This is useful for CI/CD pipelines and programmatic tooling consumption.
 When enabled, JSON mode implies non-interactive mode.
 The output includes instance IDs, names, status, and last deployment timestamps.
 
+See the [Instances List Command](/docs/cli/json-output#instances-list-command) section of the JSON Output Reference for detailed output examples.
+
 ### `inspect`
 
 `bluelink instances inspect [options]`
@@ -959,21 +961,16 @@ This is useful for CI/CD pipelines and programmatic tooling consumption.
 When enabled, JSON mode implies non-interactive mode.
 The output includes the full blueprint instance state with resources, links, child blueprints, exports and deployment status.
 
+See the [Instances Inspect Command](/docs/cli/json-output#instances-inspect-command) section of the JSON Output Reference for detailed output examples.
+
 ## `state`
 
 This is the command category for managing deploy engine state between different environments.
-These commands are useful for sharing deploy engine state between different environments when adopting a local deployment strategy.
-A local deployment strategy is where the deploy engine is running on the same machine as the CLI when running commands such as `deploy` or `destroy`.
+These commands use a backend-agnostic JSON format, allowing state to be shared between environments
+regardless of the storage backend (memfile or postgres).
 
-An example use case would be a CI/CD pipeline that runs the `stage` and `deploy` commands for a blueprint deployment using a local deploy engine installation
-in the container or VM for the job.
+An example use case would be a CI/CD pipeline that runs the `stage` and `deploy` commands for a blueprint deployment.
 Through the use of these commands, the pipeline can import the deploy engine state from the previous run of the pipeline and carry out the next deployment to the same environment.
-
-<Callout title="Note" type="info">
-The state commands can only be used when the deploy engine is running on the same machine as the CLI.
-The configuration for the deploy engine will be used to determine how data should be imported to or exported
-from the configured storage engine.
-</Callout>
 
 ### `--engine-config-file`
 
@@ -983,44 +980,39 @@ from the configured storage engine.
 
 **Type**: `string`
 
-**Default Value**: `$HOME/.bluelink/engine/config.json` on Linux or macOS 
+**Default Value**: `$HOME/.bluelink/engine/config.json` on Linux or macOS
 and `%LOCALAPPDATA%\NewStack\Bluelink\engine\config.json` on Windows.
 
-The path to the deploy engine configuration file that is needed to retrieve the details for the storage engine
-so that import and export operations can be performed.
+The path to the deploy engine configuration file. This is required to determine how state data
+is currently stored so that import and export operations can read from or write to the correct storage backend.
 
 ### `import`
 
-This command is used to import the entire state or specific blueprint instances from a local file or a remote source.
+`bluelink state import [options]`
+
+This command is used to import blueprint instances from a local file or a remote source.
+The import uses a backend-agnostic JSON format, allowing state to be migrated between different
+storage backends (e.g., from memfile to postgres or vice versa).
 
 <Callout title="Caution" type="warning">
-When importing the entire state, the deploy engine will overwrite the existing state with the imported state.
+When importing state, existing instances with matching IDs will be overwritten with the imported state.
 </Callout>
 
-An example of importing the entire state from a local file:
+Run the command without any flags and go through the interactive prompts to import state:
+
 ```bash
-bluelink state import --file ./deployment-state.tar.gz
+bluelink state import
 ```
 
-An example of importing one or more specific blueprint deployment instances from a remote source:
+Importing state from a local file:
 ```bash
-# The input file should be in the JSON format exported
-# by the `export` command with the `--instances [idOrName1,idOrName2,...]` flag.
-bluelink state import --instances --file s3://bucket-name/path/to/instances-export.json
+bluelink state import --file ./deployment-state.json
 ```
 
-#### `--instances`
-
-**Environment Variable**: `BLUELINK_CLI_STATE_IMPORT_INSTANCES`
-
-**Configuration Key**: `stateImportInstances`
-
-**Type**: `boolean`
-
-**Default Value**: `false`
-
-A flag to indicate the format of the input file is for importing specific blueprint deployment instances.
-When set, the input file is expected to be a JSON array of blueprint deployment instances.
+Importing state from a remote source:
+```bash
+bluelink state import --file s3://bucket-name/path/to/state-export.json
+```
 
 #### `--file`
 
@@ -1031,8 +1023,8 @@ When set, the input file is expected to be a JSON array of blueprint deployment 
 **Type**: `string`
 
 The path to the input file to import.
-When `--instances` is **_not_** set, the input file is expected to be a `*.tar.gz` archive of the entire deploy engine state.
-When `--instances` is set, the input file is expected to be a JSON array of blueprint deployment instances.
+The input file should be a JSON file containing an array of blueprint deployment instances,
+as exported by the `state export` command.
 
 This can be a local file or a path to a file in an object storage bucket
 in the format of `{scheme}://{bucket-name}/{object-path}`,
@@ -1044,16 +1036,41 @@ Credentials for remote object storage buckets are derived from the current envir
 mechanisms for each cloud provider.
 </Callout>
 
+#### `--json`
+
+**Environment Variable**: `BLUELINK_CLI_STATE_IMPORT_JSON`
+
+**Configuration Key**: `stateImportJson`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+Output the result as a single JSON object.
+This is useful for CI/CD pipelines and programmatic tooling consumption for importing state.
+
+See the [State Import Command](/docs/cli/json-output#state-import-command) section of the JSON Output Reference for detailed output examples.
+
 ### `export`
 
-This command is used to export the entire state or specific blueprint instances to be shared between environments.
+`bluelink state export [options]`
 
-An example of exporting the entire state to a local file:
+This command is used to export the entire state or specific blueprint instances to be shared between environments.
+The export uses a backend-agnostic JSON format, allowing state to be migrated between different
+storage backends (e.g., from memfile to postgres or vice versa).
+
+Run the command without any flags and go through the interactive prompts to export state:
+
 ```bash
-bluelink state export --file ./deployment-state.tar.gz
+bluelink state export
 ```
 
-An example of exporting one or more specific blueprint deployment instances to a remote source:
+Exporting the entire state to a local file:
+```bash
+bluelink state export --file ./deployment-state.json
+```
+
+Exporting one or more specific blueprint deployment instances to a remote source:
 ```bash
 bluelink state export --instances stack-1,stack-2,stack-3 --file s3://bucket-name/path/to/instances-export.json
 ```
@@ -1070,7 +1087,7 @@ A comma-separated list of blueprint deployment instances to export.
 You can use either the instance name or ID of each blueprint deployment instance
 that you want to export.
 
-When this option is set, the output file will be a JSON file containing an array of blueprint deployment instances.
+When this option is not set, all instances will be exported (full state export).
 
 #### `--file`
 
@@ -1081,8 +1098,7 @@ When this option is set, the output file will be a JSON file containing an array
 **Type**: `string`
 
 The path to the output file to write the export to.
-
-For clarity, the target file should be a `*.json` file when the `--instances` option is set and a `*.tar.gz` archive for a full state export.
+The output file will be a JSON file containing an array of blueprint deployment instances.
 
 This can be a local file or a path to a location in an object storage bucket
 in the format of `{scheme}://{bucket-name}/{object-path}`,
@@ -1094,6 +1110,21 @@ Credentials for remote object storage buckets are derived from the current envir
 mechanisms for each cloud provider.
 </Callout>
 
+#### `--json`
+
+**Environment Variable**: `BLUELINK_CLI_STATE_EXPORT_JSON`
+
+**Configuration Key**: `stateExportJson`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+Output the result as a single JSON object.
+This is useful for CI/CD pipelines and programmatic tooling consumption for exporting state.
+
+See the [State Export Command](/docs/cli/json-output#state-export-command) section of the JSON Output Reference for detailed output examples.
+
 ## `cleanup`
 
 `bluelink cleanup [options]`
@@ -1104,12 +1135,6 @@ for a configurable period to support operations like event replay and debugging.
 
 Running cleanup manually can be useful to free up storage space or to ensure old data is removed
 before a scheduled cleanup would normally occur.
-
-<Callout title="Note" type="info">
-Cleanup operations run asynchronously in the background. The command returns immediately after
-triggering the cleanup process. The actual cleanup may take several minutes to complete depending
-on the amount of data to be removed.
-</Callout>
 
 <Callout title="Remote Deploy Engine Support" type="info">
 Unlike commands such as `state import`, `state export`, and `plugins` subcommands that only work
@@ -1259,6 +1284,9 @@ The host of the plugin registry to log into.
 ### `list`
 
 Lists all the plugins that are installed on the machine that the CLI is running on.
+Each plugin will be rendered with its dependency tree.
+Typically, transformer plugins will depend on provider plugins
+to be able to deploy the concrete resources that the transformer produces.
 
 #### `--type`
 

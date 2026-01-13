@@ -8,7 +8,7 @@ Other use cases for authentication may arise over time.
 
 ## Overview
 
-The Bluelink CLI supports authentication via the `bluelink plugins login {host}` command, where host is expected to be a host that contains a service discovery document as per the [Service Discovery Protocol](/docs/plugin-framework/service-discovery-protocol).
+The Bluelink CLI supports authentication via the `bluelink plugins login {host}` command, where host is expected to be a host that contains a service discovery document as per the [Service Discovery Protocol](/docs/plugin-framework/registry-protocols-formats/service-discovery-protocol).
 
 The `bluelink plugins login {host}` command will prompt the user to enter the necessary configuration to be stored in the `$HOME/.bluelink/clients/plugins.auth.json` file (`%LOCALAPPDATA%\NewStack\Bluelink\clients\plugins.auth.json` on Windows) or will take them through the OAuth 2 authorization code flow to obtain an access token depending on the configuration provided in the service discovery document.
 
@@ -75,7 +75,8 @@ On the client side (e.g. environment running the Bluelink CLI), the OAuth 2 clie
         "clientId": "your-service-client-id",
         "grantTypes": ["authorization_code"],
         "authorize": "/authorize",
-        "token": "/access_token"
+        "token": "/access_token",
+        "pkce": true
     }
 }
 ```
@@ -91,5 +92,6 @@ The following are the properties that can be provided in the `auth.v1` object:
 - `grantTypes` (Optional) - A list of grant types that the service supports. The supported grant types are `client_credentials` and `authorization_code`. If omitted, the client will default to the `authorization_code` grant type.
 - `authorize` (Optional) - The path to use for the authorization step in the OAuth 2 flow. If omitted, the client will default to `/authorize`.
 - `token` (Required for OAuth) - The path to use for the token step in the OAuth 2 flow.
+- `pkce` (Optional) - A boolean indicating whether to use PKCE (Proof Key for Code Exchange) for the authorization code flow. The default is `false`.
 - `apiKeyHeader` (Required for API Key) - The HTTP header to use for the API key.
 - `downloadAuth` (Optional) - The authentication scheme to use for downloading plugins and other release artifacts. This is only required for the `apiKeyHeader` flow. The default is `bearer`. Other options are `basic` and `digest`.

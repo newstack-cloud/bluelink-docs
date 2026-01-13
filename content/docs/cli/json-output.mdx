@@ -1444,6 +1444,350 @@ When drift is detected during a destroy operation, the CLI returns a drift respo
 
 ---
 
+## Instances List Command
+
+The `bluelink instances list` command outputs JSON describing all blueprint instances when using the `--json` flag.
+
+### Successful List with Instances
+
+When instances are found:
+
+```json
+{
+  "success": true,
+  "instances": [
+    {
+      "instanceId": "4ef03ec5-9dba-4e05-a966-2b63b501f553",
+      "instanceName": "my-simple-app",
+      "status": "DEPLOYED",
+      "lastDeployedTimestamp": 1767369512
+    },
+    {
+      "instanceId": "8a2c1b4f-e7d9-4123-b456-789012345678",
+      "instanceName": "orders-service",
+      "status": "DEPLOY_FAILED",
+      "lastDeployedTimestamp": 1767350000
+    }
+  ],
+  "totalCount": 2
+}
+```
+
+### Successful List with Search Filter
+
+When using the `--search` flag to filter instances:
+
+```json
+{
+  "success": true,
+  "instances": [
+    {
+      "instanceId": "4ef03ec5-9dba-4e05-a966-2b63b501f553",
+      "instanceName": "my-simple-app",
+      "status": "DEPLOYED",
+      "lastDeployedTimestamp": 1767369512
+    }
+  ],
+  "totalCount": 1,
+  "search": "simple"
+}
+```
+
+### Empty List
+
+When no instances are found:
+
+```json
+{
+  "success": true,
+  "instances": [],
+  "totalCount": 0
+}
+```
+
+### List Output Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | boolean | Whether the list operation completed successfully |
+| `instances` | array | Array of instance summary objects |
+| `instances[].instanceId` | string | The unique identifier of the blueprint instance |
+| `instances[].instanceName` | string | The user-defined name of the blueprint instance |
+| `instances[].status` | string | The current status of the instance (e.g., `DEPLOYED`, `DEPLOY_FAILED`, `DESTROYING`) |
+| `instances[].lastDeployedTimestamp` | number | Unix timestamp of the last successful deployment |
+| `totalCount` | number | Total number of instances returned |
+| `search` | string | The search term used to filter instances (only present when `--search` is used) |
+
+### List Failed
+
+When the list operation fails:
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "client",
+    "message": "Failed to connect to deploy engine"
+  }
+}
+```
+
+---
+
+## Instances Inspect Command
+
+The `bluelink instances inspect` command outputs JSON containing the full instance state when using the `--json` flag.
+The output is the raw `InstanceState` object from the deploy engine.
+
+### Successful Inspect
+
+When inspecting an existing instance:
+
+```json
+{
+  "id": "4ef03ec5-9dba-4e05-a966-2b63b501f553",
+  "name": "my-simple-app",
+  "status": 2,
+  "lastStatusUpdateTimestamp": 1767369512,
+  "lastDeployedTimestamp": 1767369512,
+  "lastDeployAttemptTimestamp": 1767369512,
+  "resourceIds": {
+    "lambdaRole": "18dadb98-e254-45bc-8745-697e33300dfb",
+    "mainQueue": "659ed005-441e-42eb-aebb-4c890b26dc14"
+  },
+  "resources": {
+    "18dadb98-e254-45bc-8745-697e33300dfb": {
+      "id": "18dadb98-e254-45bc-8745-697e33300dfb",
+      "name": "lambdaRole",
+      "type": "aws/iam/role",
+      "instanceId": "4ef03ec5-9dba-4e05-a966-2b63b501f553",
+      "status": 2,
+      "preciseStatus": 3,
+      "lastStatusUpdateTimestamp": 1767369512,
+      "lastDeployedTimestamp": 1767369512,
+      "lastDeployAttemptTimestamp": 1767369512,
+      "specData": {
+        "arn": "arn:aws:iam::027653366630:role/bluelink-simple-test-role",
+        "roleName": "bluelink-simple-test-role",
+        "description": "Role for test environment"
+      },
+      "computedFields": ["spec.roleId", "spec.arn"],
+      "metadata": {
+        "displayName": "Lambda Role"
+      }
+    },
+    "659ed005-441e-42eb-aebb-4c890b26dc14": {
+      "id": "659ed005-441e-42eb-aebb-4c890b26dc14",
+      "name": "mainQueue",
+      "type": "aws/sqs/queue",
+      "instanceId": "4ef03ec5-9dba-4e05-a966-2b63b501f553",
+      "status": 2,
+      "preciseStatus": 3,
+      "lastStatusUpdateTimestamp": 1767369511,
+      "lastDeployedTimestamp": 1767369511,
+      "lastDeployAttemptTimestamp": 1767369511,
+      "specData": {
+        "arn": "arn:aws:sqs:eu-west-2:027653366630:bluelink-simple-test-main-queue",
+        "queueName": "bluelink-simple-test-main-queue",
+        "queueUrl": "https://sqs.eu-west-2.amazonaws.com/027653366630/bluelink-simple-test-main-queue",
+        "visibilityTimeout": 60
+      },
+      "computedFields": ["spec.arn", "spec.queueUrl"],
+      "metadata": {
+        "displayName": "Main Queue"
+      }
+    }
+  },
+  "links": {},
+  "metadata": null,
+  "exports": {
+    "mainQueueUrl": {
+      "value": "https://sqs.eu-west-2.amazonaws.com/027653366630/bluelink-simple-test-main-queue",
+      "type": "string",
+      "field": "resources.mainQueue.spec.queueUrl"
+    },
+    "roleArn": {
+      "value": "arn:aws:iam::027653366630:role/bluelink-simple-test-role",
+      "type": "string",
+      "field": "resources.lambdaRole.spec.arn"
+    }
+  },
+  "childBlueprints": {
+    "child": {
+      "id": "0a69cdfd-5b87-477d-bd90-d329db4768cb",
+      "name": "my-simple-app-child",
+      "status": 2,
+      "lastStatusUpdateTimestamp": 1767369511,
+      "lastDeployedTimestamp": 1767369511,
+      "lastDeployAttemptTimestamp": 1767369511,
+      "resourceIds": {
+        "childQueue": "ab9573a9-7102-4832-92cb-455c3e4e0dd2"
+      },
+      "resources": {
+        "ab9573a9-7102-4832-92cb-455c3e4e0dd2": {
+          "id": "ab9573a9-7102-4832-92cb-455c3e4e0dd2",
+          "name": "childQueue",
+          "type": "aws/sqs/queue",
+          "instanceId": "0a69cdfd-5b87-477d-bd90-d329db4768cb",
+          "status": 2,
+          "preciseStatus": 3,
+          "specData": {
+            "arn": "arn:aws:sqs:eu-west-2:027653366630:bluelink-simple-test-child-queue",
+            "queueName": "bluelink-simple-test-child-queue",
+            "queueUrl": "https://sqs.eu-west-2.amazonaws.com/027653366630/bluelink-simple-test-child-queue"
+          }
+        }
+      },
+      "links": {},
+      "exports": {
+        "childQueueUrl": {
+          "value": "https://sqs.eu-west-2.amazonaws.com/027653366630/bluelink-simple-test-child-queue",
+          "type": "string",
+          "field": "resources.childQueue.spec.queueUrl"
+        }
+      },
+      "childBlueprints": null
+    }
+  },
+  "childDependencies": {
+    "child": {}
+  },
+  "durations": {
+    "prepareDuration": 9.03,
+    "totalDuration": 5773.11
+  }
+}
+```
+
+### Inspect Output Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | The unique identifier of the blueprint instance |
+| `name` | string | The user-defined name of the blueprint instance |
+| `status` | number | The numeric status code of the instance |
+| `lastStatusUpdateTimestamp` | number | Unix timestamp when status was last updated |
+| `lastDeployedTimestamp` | number | Unix timestamp of last successful deployment |
+| `lastDeployAttemptTimestamp` | number | Unix timestamp of last deployment attempt |
+| `resourceIds` | object | Mapping of logical resource names to resource IDs |
+| `resources` | object | Mapping of resource IDs to their full state including `specData` |
+| `resources[id].specData` | object | The deployed specification data for the resource |
+| `resources[id].computedFields` | array | List of fields that are computed by the provider |
+| `resources[id].metadata` | object | Resource-level metadata |
+| `links` | object | Mapping of link names to their state |
+| `metadata` | object | Instance-level metadata |
+| `exports` | object | Mapping of export names to their resolved values and types |
+| `childBlueprints` | object | Mapping of child blueprint names to their full instance state (recursive) |
+| `childDependencies` | object | Mapping of child blueprint names to their dependencies |
+| `durations` | object | Timing information for the deployment |
+
+### Inspect Failed (Instance Not Found)
+
+When the specified instance does not exist:
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "not_found",
+    "message": "instance not found: my-nonexistent-stack"
+  }
+}
+```
+
+---
+
+## State Import Command
+
+The `bluelink state import` command outputs JSON describing the result of the import operation when using the `--json` flag.
+The import uses a backend-agnostic JSON format, allowing state to be migrated between different storage backends.
+
+### Successful Import
+
+When importing blueprint instances from a JSON file:
+
+```json
+{
+  "success": true,
+  "instancesCount": 5,
+  "message": "Successfully imported 5 instances"
+}
+```
+
+### Import Output Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | boolean | Whether the import operation completed successfully |
+| `instancesCount` | number | Number of blueprint instances imported |
+| `message` | string | A human-readable message describing the result |
+
+### Import Failed
+
+When the import operation fails, the output includes error details:
+
+```json
+{
+  "success": false,
+  "error": "invalid_json: failed to parse instances JSON: unexpected end of JSON input"
+}
+```
+
+---
+
+## State Export Command
+
+The `bluelink state export` command outputs JSON describing the result of the export operation when using the `--json` flag.
+The export uses a backend-agnostic JSON format, allowing state to be migrated between different storage backends.
+
+### Successful Full State Export
+
+When exporting the entire deploy engine state to a JSON file:
+
+```json
+{
+  "success": true,
+  "mode": "full_state",
+  "instancesCount": 5,
+  "message": "Successfully exported 5 instances"
+}
+```
+
+### Successful Instances Export
+
+When exporting specific blueprint instances using the `--instances` flag:
+
+```json
+{
+  "success": true,
+  "mode": "instances",
+  "instancesCount": 3,
+  "message": "Successfully exported 3 instances"
+}
+```
+
+### Export Output Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | boolean | Whether the export operation completed successfully |
+| `mode` | string | The export mode: `full_state` for complete state exports, `instances` for selective exports |
+| `instancesCount` | number | Number of blueprint instances exported |
+| `message` | string | A human-readable message describing the result |
+
+### Export Failed
+
+When the export operation fails, the output includes error details:
+
+```json
+{
+  "success": false,
+  "error": "failed to write export file: permission denied"
+}
+```
+
+---
+
 ## Common Fields
 
 All JSON outputs share these common fields:
