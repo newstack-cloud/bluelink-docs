@@ -1939,7 +1939,8 @@ The precise format for a variable reference notated in [Extended Backus-Naur For
 
 ```
 variable reference     =   "variables" , name accessor ;
-name accessor          =   ( "." , name ) | ( "[" , name in quotes , "]" ) ;
+name accessor          =   ( "." , name ) | ( "[" , quoted name , "]" ) ;
+quoted name            =   ( "'" , name in quotes , "'" ) | ( '"' , name in quotes , '"' ) ;
 name in quotes         =   { name in quotes char }- ;
 name in quotes char    =   letter | digit | "_" | "-" | "." ;
 name                   =   start name char , name chars ;
@@ -1978,7 +1979,8 @@ The precise format for a value reference notated in [Extended Backus-Naur Form](
 value reference       =   value name , [ { ( name accessor | index accessor ) } ] ;
 value name            =   ( "values." , name accessor ) ;
 index accessor        =   "[" , [ natural number ] , "]" ;
-name accessor         =   ( "." , name ) | ( "[" , name in quotes , "]" ) ;
+name accessor         =   ( "." , name ) | ( "[" , quoted name , "]" ) ;
+quoted name           =   ( "'" , name in quotes , "'" ) | ( '"' , name in quotes , '"' ) ;
 name in quotes        =   { name in quotes char }- ;
 name in quotes char   =   letter | digit | "_" | "-" | "." ;
 name                  =   start name char , name chars ;
@@ -2032,11 +2034,17 @@ as per the specification. `.metadata.displayName` is also supported to reference
 
 
 <Callout title="Tip" type="info">
-Any fields with names that contain `.`, such as annotations where it is encouraged
-can be referenced using quotation marks like so:
+Any fields with names that contain `.`, such as annotations where it is encouraged,
+can be referenced using either double or single quotes:
 
 ```
 ${*.annotations["myAnnotation.populateEnvVars"]}
+```
+
+or
+
+```
+${*.annotations['myAnnotation.populateEnvVars']}
 ```
 </Callout>
 
@@ -2048,7 +2056,8 @@ The precise format for a resource reference notated in [Extended Backus-Naur For
 resource reference    =   resource name , [ { ( name accessor | index accessor ) } ] ;
 resource name         =   ( "resources." , name accessor ) | name ;
 index accessor        =   "[" , [ natural number ] , "]" ;
-name accessor         =   ( "." , name ) | ( "[" , name in quotes , "]" ) ;
+name accessor         =   ( "." , name ) | ( "[" , quoted name , "]" ) ;
+quoted name           =   ( "'" , name in quotes , "'" ) | ( '"' , name in quotes , '"' ) ;
 name in quotes        =   { name in quotes char }- ;
 name in quotes char   =   letter | digit | "_" | "-" | "." ;
 name                  =   start name char , name chars ;
@@ -2089,7 +2098,8 @@ The precise format for a data source reference notated in [Extended Backus-Naur 
 ```
 data source reference     =   "datasources" , name accessor , name accessor , [ index accessor ] ;
 index accessor            =   "[" , [ natural number ] , "]" ;
-name accessor             =   ( "." , name ) | ( "[" , name in quotes , "]" ) ;
+name accessor             =   ( "." , name ) | ( "[" , quoted name , "]" ) ;
+quoted name               =   ( "'" , name in quotes , "'" ) | ( '"' , name in quotes , '"' ) ;
 name in quotes            =   { name in quotes char }- ;
 name in quotes char       =   letter | digit | "_" | "-" | "." ;
 name                      =   start name char , name chars ;
@@ -2145,7 +2155,8 @@ The precise format for an element reference notated in [Extended Backus-Naur For
 elem reference        =   "elem" , [ { ( name accessor | index accessor ) } ] ;
 elem index reference  =   "i" ;
 index accessor        =   "[" , [ natural number ] , "]" ;
-name accessor         =   ( "." , name ) | ( "[" , name in quotes , "]" ) ;
+name accessor         =   ( "." , name ) | ( "[" , quoted name , "]" ) ;
+quoted name           =   ( "'" , name in quotes , "'" ) | ( '"' , name in quotes , '"' ) ;
 name in quotes        =   { name in quotes char }- ;
 name in quotes char   =   letter | digit | "_" | "-" | "." ;
 name                  =   start name char , name chars ;
@@ -2180,7 +2191,8 @@ The precise format for a child blueprint reference notated in [Extended Backus-N
 ```
 child blueprint reference     =   "children." , name accessor , { name accessor | index accessor }- ;
 index accessor                =   "[" , [ natural number ] , "]" ;
-name accessor                 =   ( "." , name ) | ( "[" , name in quotes , "]" ) ;
+name accessor                 =   ( "." , name ) | ( "[" , quoted name , "]" ) ;
+quoted name                   =   ( "'" , name in quotes , "'" ) | ( '"' , name in quotes , '"' ) ;
 name in quotes                =   { name in quotes char }- ;
 name in quotes char           =   letter | digit | "_" | "-" | "." ;
 name                          =   start name char , name chars ;
@@ -3003,7 +3015,8 @@ data source reference        =   "datasources" , name accessor , name accessor ,
 child blueprint reference    =   "children" , name accessor , { name accessor | index accessor }- ;
 resource reference           =   resource name , [ { ( name accessor | index acessor ) } ] ;
 resource name                =   ( "resources." , name accessor ) | name ;
-name accessor                =   ( "." , name ) | ( "[" , name in quotes , "]" ) ;
+name accessor                =   ( "." , name ) | ( "[" , quoted name , "]" ) ;
+quoted name                  =   ( "'" , name in quotes , "'" ) | ( '"' , name in quotes , '"' ) ;
 index accessor               =   "[" , [ natural number ] , "]" ;
 literal                      =   bool literal | float literal | int literal | string literal | none literal ;
 
