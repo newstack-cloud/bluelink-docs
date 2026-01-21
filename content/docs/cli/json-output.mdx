@@ -1788,6 +1788,312 @@ When the export operation fails, the output includes error details:
 
 ---
 
+## Structured Errors
+
+When an operation fails, the CLI returns a structured error response with detailed information to help diagnose and resolve the issue. All error responses follow a consistent schema that includes error classification, diagnostic information, and actionable suggestions.
+
+### Error Response Schema
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "validation",
+    "message": "Blueprint validation failed",
+    "statusCode": 400,
+    "diagnostics": [...],
+    "validation": [...]
+  }
+}
+```
+
+### Error Types
+
+The `error.type` field classifies the error into one of the following categories:
+
+| Type | Description |
+|------|-------------|
+| `validation` | Blueprint validation failures with diagnostic information and validation errors |
+| `stream` | Errors that occur during streaming operations (deployment, destroy, staging) |
+| `client` | Client-side errors from the deploy engine API (authentication, network, drift) |
+| `internal` | Generic unclassified errors |
+
+### Error Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | string | Error classification (see Error Types above) |
+| `message` | string | Primary error message describing what went wrong |
+| `statusCode` | number | HTTP status code from the deploy engine (when applicable) |
+| `diagnostics` | array | Detailed diagnostic information with line numbers, codes, and suggested fixes |
+| `validation` | array | Validation-specific errors with location and type information |
+
+### Diagnostics
+
+The `diagnostics` array provides granular error context including source locations and suggested remediation actions. Each diagnostic has the following structure:
+
+```json
+{
+  "level": "error",
+  "message": "Unknown resource type 'aws/invalid/type'",
+  "line": 15,
+  "column": 5,
+  "code": "UNKNOWN_RESOURCE_TYPE",
+  "category": "blueprint",
+  "suggestedActions": [
+    {
+      "type": "check_resource_type",
+      "title": "Verify resource type",
+      "description": "Check that the resource type is correct and the provider is installed",
+      "commands": ["bluelink providers list"],
+      "links": [
+        {
+          "title": "Resource Types Reference",
+          "url": "https://docs.bluelink.dev/reference/resources"
+        }
+      ]
+    }
+  ]
+}
+```
+
+#### Diagnostic Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `level` | string | Severity level: `error`, `warning`, or `info` |
+| `message` | string | Detailed diagnostic message |
+| `line` | number | Line number in the blueprint file where the error occurred |
+| `column` | number | Column number in the blueprint file |
+| `code` | string | Machine-readable error/reason code |
+| `category` | string | Error category (e.g., `blueprint`, `provider`, `resource`) |
+| `suggestedActions` | array | Actionable suggestions for resolving the error |
+
+#### Suggested Action Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | string | Action type (e.g., `install_provider`, `check_resource_type`, `update_provider`) |
+| `title` | string | Human-readable title for the suggested action |
+| `description` | string | Detailed description of what the action does |
+| `commands` | array | CLI commands that can be run to resolve the issue |
+| `links` | array | Documentation links with `title` and `url` fields |
+
+### Validation Errors
+
+For validation-specific errors (typically HTTP 400), the `validation` array provides structured information about each validation failure:
+
+```json
+{
+  "validation": [
+    {
+      "location": "metadata.name",
+      "message": "Name field cannot be empty",
+      "type": "required_field"
+    },
+    {
+      "location": "resources.myQueue.spec.queueName",
+      "message": "Queue name must be alphanumeric",
+      "type": "invalid_format"
+    }
+  ]
+}
+```
+
+#### Validation Error Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `location` | string | Path in the blueprint where the error occurred (e.g., `metadata.name`, `resources.myQueue.spec.queueName`) |
+| `message` | string | Description of the validation error |
+| `type` | string | Specific validation error type (e.g., `required_field`, `invalid_format`, `invalid_type`) |
+
+### Complete Validation Error Example
+
+This example shows a comprehensive validation error response with multiple diagnostics and suggested actions:
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "validation",
+    "message": "Blueprint validation failed",
+    "statusCode": 400,
+    "diagnostics": [
+      {
+        "level": "error",
+        "message": "Provider 'custom/mycloud' is not installed",
+        "line": 8,
+        "column": 12,
+        "code": "PROVIDER_NOT_INSTALLED",
+        "category": "provider",
+        "suggestedActions": [
+          {
+            "type": "install_provider",
+            "title": "Install the required provider",
+            "description": "The provider 'custom/mycloud' needs to be installed before deploying this blueprint",
+            "commands": [
+              "bluelink providers install custom/mycloud"
+            ],
+            "links": [
+              {
+                "title": "Provider Installation Guide",
+                "url": "https://docs.bluelink.dev/guides/providers"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "level": "error",
+        "message": "Resource 'orderQueue' references undefined variable '${variables.queuePrefix}'",
+        "line": 22,
+        "column": 18,
+        "code": "UNDEFINED_VARIABLE",
+        "category": "blueprint",
+        "suggestedActions": [
+          {
+            "type": "define_variable",
+            "title": "Define the missing variable",
+            "description": "Add the variable 'queuePrefix' to your blueprint's variables section",
+            "links": [
+              {
+                "title": "Blueprint Variables",
+                "url": "https://docs.bluelink.dev/reference/blueprint#variables"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "validation": [
+      {
+        "location": "resources.orderQueue.spec.queueName",
+        "message": "Cannot resolve variable reference '${variables.queuePrefix}'",
+        "type": "unresolved_reference"
+      }
+    ]
+  }
+}
+```
+
+### Stream Error Example
+
+Stream errors occur during deployment, destroy, or staging operations when the streaming connection encounters an issue:
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "stream",
+    "message": "Deployment stream interrupted: connection timeout",
+    "statusCode": 504,
+    "diagnostics": [
+      {
+        "level": "error",
+        "message": "The deployment operation timed out while waiting for resource 'lambdaFunction' to reach ready state",
+        "code": "DEPLOYMENT_TIMEOUT",
+        "category": "deployment",
+        "suggestedActions": [
+          {
+            "type": "retry_deployment",
+            "title": "Retry the deployment",
+            "description": "The deployment may succeed on retry if the timeout was transient",
+            "commands": [
+              "bluelink deploy --changeset <changeset-id>"
+            ]
+          },
+          {
+            "type": "check_resource_logs",
+            "title": "Check resource logs",
+            "description": "Review the cloud provider logs for the resource to identify any issues",
+            "links": [
+              {
+                "title": "Debugging Deployments",
+                "url": "https://docs.bluelink.dev/guides/debugging"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Client Error Example
+
+Client errors are returned when there are issues communicating with the deploy engine or authentication failures:
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "client",
+    "message": "Failed to authenticate with deploy engine",
+    "statusCode": 401,
+    "diagnostics": [
+      {
+        "level": "error",
+        "message": "The provided API token is invalid or has expired",
+        "code": "AUTHENTICATION_FAILED",
+        "category": "auth",
+        "suggestedActions": [
+          {
+            "type": "refresh_token",
+            "title": "Refresh your authentication token",
+            "description": "Generate a new API token and update your configuration",
+            "commands": [
+              "bluelink auth login"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### State Import/Export Error Codes
+
+State import and export operations use specific error codes to identify the cause of failure:
+
+#### Import Error Codes
+
+| Code | Description |
+|------|-------------|
+| `invalid_json` | The input file contains malformed JSON |
+| `file_not_found` | The specified input file does not exist |
+| `remote_access_failed` | Failed to access a remote file location |
+
+#### Export Error Codes
+
+| Code | Description |
+|------|-------------|
+| `export_failed` | General export failure |
+| `not_found` | The specified instances were not found |
+| `remote_upload_failed` | Failed to upload to a remote file location |
+
+### State Import Error Example
+
+```json
+{
+  "success": false,
+  "error": "invalid_json: failed to parse instances JSON: unexpected end of JSON input"
+}
+```
+
+### State Export Error Example
+
+```json
+{
+  "success": false,
+  "error": "not_found: one or more specified instances do not exist: my-missing-app, other-missing-app"
+}
+```
+
+---
+
 ## Common Fields
 
 All JSON outputs share these common fields:
@@ -1799,5 +2105,8 @@ All JSON outputs share these common fields:
 | `instanceName` | string | The user-defined name of the blueprint instance |
 | `message` | string | A human-readable message describing the result |
 | `error` | object | Error details when `success` is `false` |
-| `error.type` | string | The type of error (e.g., `validation`, `not_found`, `deployment`) |
+| `error.type` | string | The type of error (e.g., `validation`, `stream`, `client`, `internal`) |
 | `error.message` | string | A description of the error |
+| `error.statusCode` | number | HTTP status code from the deploy engine (when applicable) |
+| `error.diagnostics` | array | Detailed diagnostic information (see Structured Errors section) |
+| `error.validation` | array | Validation-specific errors (see Structured Errors section) |
