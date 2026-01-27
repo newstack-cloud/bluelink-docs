@@ -59,6 +59,38 @@ resources:
 
 You may be familiar with this kind of behaviour from Kubernetes services and selectors.
 
+## Excluding Resources from Link Selection
+
+When multiple resources share the same labels, the `linkSelector` will match all of them by default.
+In cases where you need to exclude specific resources from being linked, you can use the `exclude` field.
+
+The `exclude` field takes a list of resource names that should be skipped during link selection,
+even if they match the `byLabel` criteria:
+
+```yaml
+resources:
+  orderProcessor:
+    type: "aws/lambda/function"
+    linkSelector:
+      byLabel:
+        app: orderApi
+      exclude:
+        - testOrderTable  # Won't link to testOrderTable even though it has app: orderApi label
+    spec:
+      handler: processOrder.handler
+      runtime: nodejs20.x
+      codeUri: ./src
+```
+
+This is useful for scenarios such as:
+- Excluding test or staging resources from production workloads
+- Preventing specific resources from being linked when labels are shared across multiple resources
+- Fine-tuning link relationships without creating additional label dimensions
+
+For more details on the `exclude` field, see the [linkSelectorDefinitions](/docs/bluelink/blueprints/specification#linkselectordefinitions) specification.
+
+## Link Configuration with Annotations
+
 As you may have noticed, `metadata.annotations` is used to add information about the link, this lets a provider know exactly how to connect to the target resource when there are multiple options.
 In the example above, there are multiple options as an AWS API Gateway can connect to lambda functions in different ways, such as for a route or a custom authorizer.
 

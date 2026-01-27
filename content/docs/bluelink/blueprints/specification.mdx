@@ -1554,9 +1554,77 @@ In this version of the specification, the only supported linkSelector type is `b
 A selector that can be used to select resources that match a set of labels.
 When multiple labels are defined, implementations of the specification should require **ALL** labels to match.
 
-**field type** 
+**field type**
 
 mapping[string, string]
+
+___
+
+<FieldHeading fieldName="exclude" />
+
+An optional list of resource names to exclude from the link selection.
+This provides a way to handle disambiguation when multiple resources match the `byLabel` criteria
+but only specific resources should be linked.
+
+When a resource name is included in the `exclude` list, it will not be linked to even if its labels
+match the `byLabel` selector criteria.
+
+<Callout title="Note" type="info">
+Substitutions are not allowed in exclude values. The values must be literal resource names as defined in the blueprint.
+</Callout>
+
+**Example usage:**
+
+```yaml
+resources:
+  # Links to all resources with app: orders EXCEPT testOrdersTable
+  saveOrderFunction:
+    type: aws/lambda/function
+    linkSelector:
+      byLabel:
+        app: orders
+      exclude:
+        - testOrdersTable
+    spec:
+      handler: save_order.handler
+      runtime: python3.9
+
+  # This lambda excludes a different resource
+  sendOrderNotification:
+    type: aws/lambda/function
+    linkSelector:
+      byLabel:
+        app: orders
+      exclude:
+        - ordersTable
+    spec:
+      handler: send_notification.handler
+      runtime: python3.9
+
+  # Target resources - both have the app: orders label
+  ordersTable:
+    type: aws/dynamodb/table
+    metadata:
+      labels:
+        app: orders
+    spec:
+      tableName: orders
+
+  testOrdersTable:
+    type: aws/dynamodb/table
+    metadata:
+      labels:
+        app: orders
+    spec:
+      tableName: test_orders
+```
+
+In the example above, `saveOrderFunction` will link to `ordersTable` but not `testOrdersTable`,
+while `sendOrderNotification` will link to `testOrdersTable` but not `ordersTable`.
+
+**field type**
+
+array[string]
 
 <br/>
 
