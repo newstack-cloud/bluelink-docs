@@ -87,6 +87,24 @@ This is used to authenticate with the deploy engine when using the `stage`, `dep
 
 See the [Auth Configuration](/docs/cli/auth-configuration) documentation for more information on what is expected to be present in this file.
 
+### `--skip-plugin-check`
+
+**Environment Variable**: `BLUELINK_CLI_SKIP_PLUGIN_CHECK`
+
+**Configuration Key**: `skipPluginCheck`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+Skip the automatic plugin dependency check that runs before the
+`validate`, `stage`, `deploy` and `destroy` commands.
+
+When the Deploy Engine is running on the same machine as the CLI
+(connected via unix socket or TCP to localhost), the CLI automatically
+checks the deploy configuration file for plugin dependencies and installs
+any that are missing. Set this flag to disable that behaviour.
+
 ## `init`
 
 `bluelink init [options] [directory]`
@@ -201,7 +219,26 @@ Run the command without any flags to list all the available templates:
 bluelink templates list
 ```
 
-This is mostly useful in interactive mode where you can navigate and filter the templates available.
+Search templates by name:
+```bash
+bluelink templates list --search "api"
+```
+
+This is mostly useful in interactive mode where you can navigate and filter
+the templates available. The interactive mode displays a split pane with a
+list of templates on the left and template details on the right.
+
+#### `--search`
+
+**Environment Variable**: `BLUELINK_CLI_TEMPLATES_LIST_SEARCH`
+
+**Configuration Key**: `templatesListSearch`
+
+**Type**: `string`
+
+**Default Value**: `""`
+
+Filter templates by name using a case-insensitive substring match.
 
 ## `validate`
 
@@ -1288,6 +1325,23 @@ Each plugin will be rendered with its dependency tree.
 Typically, transformer plugins will depend on provider plugins
 to be able to deploy the concrete resources that the transformer produces.
 
+In interactive mode, you can navigate the plugin list and search by pressing `/`.
+
+List all installed plugins:
+```bash
+bluelink plugins list
+```
+
+List only provider plugins:
+```bash
+bluelink plugins list --type provider
+```
+
+Search plugins by name:
+```bash
+bluelink plugins list --search "aws"
+```
+
 #### `--type`
 
 **Environment Variable**: `BLUELINK_CLI_PLUGINS_LIST_TYPE`
@@ -1301,6 +1355,19 @@ to be able to deploy the concrete resources that the transformer produces.
 **Default Value**: `all`
 
 The type of plugins to list.
+
+#### `--search`
+
+**Environment Variable**: `BLUELINK_CLI_PLUGINS_LIST_SEARCH`
+
+**Configuration Key**: `pluginsListSearch`
+
+**Type**: `string`
+
+**Default Value**: `""`
+
+Filter plugins by name using a case-insensitive substring match.
+In interactive mode, you can also press `/` to enter search mode.
 
 ### `install`
 
