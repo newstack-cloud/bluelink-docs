@@ -10,15 +10,15 @@ This section provides an overview of the versioning strategy for Bluelink spanni
 ## Version Strategy
 
 ### v0 (Current) - Evolving Capabilities
-**Initial Release**: May 31st, 2026
+**Initial Release**: June 30th, 2026
  
-**Evolution Period**: May 2026 - May 2027
+**Evolution Period**: June 2026 - June 2027
 
 v0 represents the initial release of Bluelink with a full set of capabilities with a core set of plugins that will be continuously expanded until the release of v1.
 
 The current v0 release supports managing infrastructure for a subset of AWS services:
 
-#### Current v0 Components (May 2026)
+#### Current v0 Components (June 2026)
 - **Bluelink CLI**: Full set of commands for validating, change staging, deploying blueprints and managing plugins.
 - **Deploy Engine**: The engine that powers validation, change staging and deployments.
 - **Plugin Framework**: The framework that powers the plugin system, providing an SDK to build Bluelink plugins with Go.
@@ -28,11 +28,15 @@ The current v0 release supports managing infrastructure for a subset of AWS serv
 - **Celerity Transformer**: The transformer plugin that powers the transformation of Celerity application resources into concrete resources in multiple target environments.
     In v0, this will only support the transformation of Celerity application resources into concrete resources in AWS required for [Celerity v0](https://celerityframework.io/docs/framework/versions).
 
+#### Profile Note
+
+The Bluelink CLI and AWS Provider plugin are installed as part of the **Bluelink profile** (default). The Celerity Transformer and Celerity plugin are installed as part of the **Celerity profile**, which also includes the AWS Provider. The Deploy Engine, Plugin Framework, and Blueprint Language Server are shared across both profiles. See [Profiles](/docs/bluelink/profiles) for details on how profiles affect which components are installed.
+
 #### Core Plugin Cloud Provider Support
 - **AWS only** (initially)
 
 ### v1 (Preview) - Full Capabilities
-**Target Release**: May 2027
+**Target Release**: June 2027
 
 v1 represents the full vision for Bluelink with complete multi-cloud capabilities:
 
@@ -49,6 +53,10 @@ v1 represents the full vision for Bluelink with complete multi-cloud capabilitie
     mainly focusing on the core services that are required to power [Celerity v1](https://celerityframework.io/docs/framework/versions).
 - **Celerity Transformer**: The transformer plugin that powers the transformation of Celerity application resources into concrete resources in multiple target environments.
     In v1, this will support the transformation of Celerity application resources into concrete resources in AWS, Azure and Google Cloud required for [Celerity v1](https://celerityframework.io/docs/framework/versions).
+
+#### Profile Note
+
+The cloud provider plugins (AWS, Azure, Google Cloud) are shared across both the Bluelink and Celerity profiles. The Celerity Transformer is specific to the Celerity profile. See [Profiles](/docs/bluelink/profiles) for details.
 
 #### Core Plugin Cloud Provider Support
 - **AWS** - Coverage of core AWS services

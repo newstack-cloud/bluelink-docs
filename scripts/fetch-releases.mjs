@@ -170,15 +170,15 @@ function processComponentReleases(allReleases, componentKey, config) {
 }
 
 /**
- * Fetch Windows installer from the rolling release tag
+ * Fetch Windows installer from a rolling release tag
  */
-async function fetchWindowsInstaller(allReleases) {
+async function fetchWindowsInstallerByTag(allReleases, tag) {
   const installerRelease = allReleases.find(
-    (release) => release.tag_name === 'windows-installer-latest' && !release.draft
+    (release) => release.tag_name === tag && !release.draft
   );
 
   if (!installerRelease) {
-    console.warn('Warning: windows-installer-latest release not found');
+    console.warn(`Warning: ${tag} release not found`);
     return null;
   }
 
@@ -186,7 +186,7 @@ async function fetchWindowsInstaller(allReleases) {
   const checksumAsset = installerRelease.assets.find((a) => a.name.endsWith('.msi.sha256'));
 
   if (!msiAsset) {
-    console.warn('Warning: MSI asset not found in windows-installer-latest release');
+    console.warn(`Warning: MSI asset not found in ${tag} release`);
     return null;
   }
 
@@ -209,7 +209,8 @@ async function main() {
 
     const result = {
       generatedAt: new Date().toISOString(),
-      windowsInstaller: await fetchWindowsInstaller(allReleases),
+      windowsInstaller: await fetchWindowsInstallerByTag(allReleases, 'windows-installer-latest'),
+      windowsInstallerCelerity: await fetchWindowsInstallerByTag(allReleases, 'windows-installer-celerity-latest'),
     };
 
     // Process each component

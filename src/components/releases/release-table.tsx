@@ -30,10 +30,7 @@ export default function ReleaseTable({ component, showVersions = 3 }: ReleaseTab
   if (releases.length === 0) {
     return (
       <div className="rounded-lg border border-fd-border bg-fd-card p-6 text-center text-fd-muted-foreground">
-        <p>No releases available for {displayName}.</p>
-        <p className="text-sm mt-2">
-          Run <code className="bg-fd-muted px-1 rounded">yarn fetch-releases</code> to fetch the latest releases.
-        </p>
+        <p>No releases available for {displayName} yet. Check back soon.</p>
       </div>
     );
   }

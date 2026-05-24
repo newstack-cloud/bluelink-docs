@@ -1,18 +1,31 @@
-import { getWindowsInstaller, formatBytes, formatDate } from '@/data/releases';
+import { getWindowsInstaller, getWindowsInstallerCelerity, formatBytes, formatDate } from '@/data/releases';
 import { cn } from '@/lib/cn';
 import { buttonVariants } from '@/components/ui/button';
 import { Download, FileText, ExternalLink } from 'lucide-react';
 
-export default function WindowsInstallerDownload() {
-  const installer = getWindowsInstaller();
+interface WindowsInstallerDownloadProps {
+  profile?: 'bluelink' | 'celerity';
+}
+
+const PROFILE_CONFIG = {
+  bluelink: {
+    title: 'Windows Installer',
+    description: 'This installer will set up the Bluelink Manager, configure startup services, and prepare all necessary directories.',
+  },
+  celerity: {
+    title: 'Celerity Windows Installer',
+    description: 'This installer will set up the Bluelink Manager with the Celerity profile, configure startup services, and prepare all necessary directories.',
+  },
+} as const;
+
+export default function WindowsInstallerDownload({ profile = 'bluelink' }: WindowsInstallerDownloadProps) {
+  const installer = profile === 'celerity' ? getWindowsInstallerCelerity() : getWindowsInstaller();
+  const config = PROFILE_CONFIG[profile];
 
   if (!installer) {
     return (
       <div className="rounded-lg border border-fd-border bg-fd-card p-6 text-center text-fd-muted-foreground not-prose">
-        <p>Windows installer not available.</p>
-        <p className="text-sm mt-2">
-          Run <code className="bg-fd-muted px-1 rounded">yarn fetch-releases</code> to fetch the latest releases.
-        </p>
+        <p>Windows installer not available yet. Check back soon.</p>
       </div>
     );
   }
@@ -21,7 +34,7 @@ export default function WindowsInstallerDownload() {
     <div className="rounded-lg border border-fd-border bg-fd-card overflow-hidden not-prose">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-fd-border bg-fd-muted/50 px-4 py-3">
         <div className="flex items-center gap-3">
-          <span className="text-lg font-semibold">Windows Installer</span>
+          <span className="text-lg font-semibold">{config.title}</span>
           <a
             href={installer.releaseUrl}
             target="_blank"
@@ -57,7 +70,7 @@ export default function WindowsInstallerDownload() {
           <span className="text-sm text-fd-muted-foreground">{installer.filename}</span>
         </div>
         <p className="mt-3 text-sm text-fd-muted-foreground">
-          This installer will set up the Bluelink Manager, configure startup services, and prepare all necessary directories.
+          {config.description}
         </p>
         <p className="mt-2 text-sm text-fd-muted-foreground">
           Released on {formatDate(installer.publishedAt)}

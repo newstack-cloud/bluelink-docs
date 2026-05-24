@@ -1313,6 +1313,48 @@ The linkSelector query is only applied to resources within the same blueprint, i
 
 ___
 
+<FieldHeading fieldName="removalPolicy" />
+
+Controls what happens to the underlying resource in the provider when the resource is removed from the blueprint (either by being deleted from the source file or by a `condition` that evaluates to `false` on a subsequent deployment).
+
+The field takes one of two literal string values:
+
+- `delete` (default) - the underlying resource is destroyed in the provider when it is removed from the blueprint.
+- `retain` - the underlying resource is left untouched in the provider and simply removed from the blueprint's managed state. Implementations of the spec should still clean up any internal bookkeeping (links, drift tracking, state entries) associated with the resource.
+
+<Callout title="Tip" type="info">
+Use `retain` for stateful resources that you want to protect from accidental destruction. For example, databases, object storage buckets with data, or resources you are handing off to another management system.
+</Callout>
+
+The value must be a static literal. Substitutions (`${..}`) are **not** supported for this field, because lifecycle decisions should be fixed at authoring time rather than depending on runtime variable state.
+
+An example of using `removalPolicy` for a resource would be:
+
+```yaml
+resources:
+  ordersTable:
+    type: aws/dynamodb/table
+    removalPolicy: retain
+    spec:
+      tableName: orders
+      attributeDefinitions:
+        - attributeName: order_id
+          attributeType: N
+      keySchema:
+        - attributeName: order_id
+          keyType: HASH
+```
+
+<Callout title="Caution" type="warning">
+When `removalPolicy: retain` is set, the resource will be orphaned in the provider when removed from the blueprint. Implementations should surface a clear log or change-staging message when a retained resource is detached, so operators are aware that a resource is no longer managed but still exists.
+</Callout>
+
+**field type** 
+
+string (one of `delete`, `retain`)
+
+___
+
 <FieldHeading fieldName="spec (required)" />
 
 The specification for the resource that will be used to create/update and synchronise blueprint lifecylce state with the resource in the provider.
@@ -2557,6 +2599,19 @@ resources:
     type: aws/lambda/function
     dependsOn:
       - ${variables.cacheCluster}
+```
+</Callout>
+
+References can **not** be used in the `removalPolicy` property. Lifecycle decisions must be fixed at authoring time rather than depending on runtime variable state.
+
+An example of this would be the following:
+
+<Callout title="Invalid" type="error">
+```yaml title="blueprint.yaml"
+resources:
+  ordersTable:
+    type: aws/dynamodb/table
+    removalPolicy: ${variables.retainResources}
 ```
 </Callout>
 

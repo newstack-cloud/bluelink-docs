@@ -13,6 +13,8 @@ There are three ways to install Bluelink:
 2. **Using Bluelink Manager** - Download the manager binary and use it to install components
 3. **Manual Installation** - Download and configure each component individually
 
+The Bluelink Manager also supports **profiles** for installing different toolchains. By default, the Bluelink profile is installed. To install the Celerity profile or run both side-by-side, see the [Profiles](/docs/bluelink/profiles) page.
+
 ## Easy Install (Recommended)
 
 For the quickest setup, follow the installation instructions in the [Quick Start guide](/docs/bluelink). This uses a single command to install everything you need.
@@ -23,7 +25,7 @@ The Bluelink Manager is a cross-platform CLI tool that handles the installation,
 
 - **Bluelink CLI** - The command-line interface for infrastructure management
 - **Deploy Engine** - A background service that handles deployments
-- **Blueprint Language Server** - Provides IDE support for blueprint files
+- **Blueprint Language Server** - Provides diagnostics, validation and auto-complete for blueprint files in editors through extensions such as the [Bluelink VSCode extension](https://marketplace.visualstudio.com/items?itemName=NewStack.bluelink)
 
 ### Installing the Manager
 
@@ -62,6 +64,8 @@ The installer will:
 - Set up a startup application
 - Prepare all necessary directories
 - Configure the Deploy Engine as a Windows Service
+
+A separate Windows installer is also available for the Celerity profile. See the [Profiles](/docs/bluelink/profiles#windows-installers) page for details.
 
 Alternatively, you can use Windows Subsystem for Linux (WSL) and run:
 
@@ -143,13 +147,15 @@ bluelink-manager install
 
 </InstallBluelink>
 
+To install the Celerity profile instead, use `bluelink-manager install --profile celerity`. See [Profiles](/docs/bluelink/profiles) for details.
+
 The shell script and Windows installer handle PATH configuration and run this command automatically, so you can skip this step if you used one of those methods.
 
 This will download and install:
-- The Bluelink CLI
+- The Bluelink CLI (or the Celerity CLI if using the Celerity profile)
 - The Deploy Engine (configured as a background service)
 - The Blueprint Language Server
-- Core Deploy Engine plugins
+- Core Deploy Engine plugins for the selected profile
 
 You can verify the installation by running:
 
@@ -179,7 +185,14 @@ bluelink-manager self-update
 
 # Uninstall all components
 bluelink-manager uninstall
+
+# Install or manage a specific profile
+bluelink-manager install --profile celerity
+bluelink-manager update --profile celerity
+bluelink-manager uninstall --profile celerity
 ```
+
+For a full explanation of profiles, see the [Profiles](/docs/bluelink/profiles) page.
 
 ## Installing Components Individually
 
@@ -544,6 +557,8 @@ After installation, your Bluelink directory will have the following structure:
 ```
 
 </InstallBluelink>
+
+When multiple profiles are installed, additional CLI binaries appear in the `bin/` directory. For example, with the Celerity profile installed alongside Bluelink, you will also see a `celerity` binary. See [Profiles](/docs/bluelink/profiles#directory-structure) for the full multi-profile directory layout.
 
 ## Running Deploy Engine in Docker
 

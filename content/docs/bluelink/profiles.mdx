@@ -1,0 +1,225 @@
+---
+title: Profiles
+description: Understanding Bluelink Manager profiles for Bluelink and Celerity
+---
+
+The Bluelink Manager supports **profiles** that configure which CLI binary and plugins are installed. Profiles allow the same manager binary and shared components to serve different toolchains.
+
+## What is a Profile?
+
+A profile defines:
+- Which CLI binary to install (and from which repository)
+- Which set of Deploy Engine plugins to include as defaults
+
+Shared components (Deploy Engine and Blueprint Language Server) are installed once regardless of which profiles are active. The manifest at `~/.bluelink/manifest.json` tracks which profiles are currently installed.
+
+## Available Profiles
+
+| | Bluelink (default) | Celerity |
+|---|---|---|
+| **CLI binary** | `bluelink` | `celerity` |
+| **CLI source** | [newstack-cloud/bluelink](https://github.com/newstack-cloud/bluelink) | [newstack-cloud/celerity](https://github.com/newstack-cloud/celerity) |
+| **Core plugins** | `newstack-cloud/aws` | `newstack-cloud/aws`, `newstack-cloud/celerity` |
+| **Deploy Engine** | Shared | Shared |
+| **Blueprint Language Server** | Shared | Shared |
+
+For Celerity CLI downloads, SBOMs, and verification, see the [Celerity installation guide](https://celerityframework.io/docs/framework/installing-celerity).
+
+## Installing a Profile
+
+### Default Installation (Bluelink profile)
+
+When you install using the Bluelink Manager without specifying a profile, the Bluelink profile is used:
+
+```bash
+bluelink-manager install
+```
+
+This is equivalent to:
+
+```bash
+bluelink-manager install --profile bluelink
+```
+
+### Installing the Celerity Profile
+
+To install the Celerity profile:
+
+```bash
+bluelink-manager install --profile celerity
+```
+
+Or use the Celerity bootstrap script, which downloads the Bluelink Manager and automatically installs the Celerity profile:
+
+<InstallBluelink matchPlatform="mac">
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSfL https://manager-sh.celerityframework.io | sh
+```
+
+</InstallBluelink>
+
+<InstallBluelink matchPlatform="linux">
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSfL https://manager-sh.celerityframework.io | sh
+```
+
+</InstallBluelink>
+
+<InstallBluelink matchPlatform="windows">
+
+For Windows, download and run the Celerity MSI installer:
+
+<WindowsInstallerDownload profile="celerity" />
+
+Alternatively, you can use Windows Subsystem for Linux (WSL) and run:
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSfL https://manager-sh.celerityframework.io | sh
+```
+
+</InstallBluelink>
+
+<InstallBluelink isDefault>
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSfL https://manager-sh.celerityframework.io | sh
+```
+
+</InstallBluelink>
+
+### Installing Both Profiles
+
+Both profiles can be installed side-by-side on the same machine:
+
+```bash
+bluelink-manager install --profile bluelink,celerity
+```
+
+Shared components (Deploy Engine and Blueprint Language Server) are only downloaded once. Each profile's CLI binary and plugins are installed independently.
+
+## Managing Profiles
+
+### Updating a Specific Profile
+
+```bash
+# Update all installed profiles
+bluelink-manager update
+
+# Update only the Celerity profile
+bluelink-manager update --profile celerity
+```
+
+### Uninstalling a Profile
+
+```bash
+# Uninstall only the Celerity profile
+bluelink-manager uninstall --profile celerity
+```
+
+When you uninstall a single profile, shared components remain intact if another profile still needs them. Only the profile-specific CLI binary and plugins are removed.
+
+### Checking Status
+
+```bash
+bluelink-manager status
+```
+
+This shows all installed profiles, component versions, and the Deploy Engine service status.
+
+## Windows Installers
+
+Separate MSI installers are available for each profile:
+
+### Bluelink Windows Installer
+
+<WindowsInstallerDownload />
+
+### Celerity Windows Installer
+
+<WindowsInstallerDownload profile="celerity" />
+
+Both installers use the same installation directory (`%LOCALAPPDATA%\NewStack\Bluelink\`) and share common components. Installing both is safe as shared components are reference-counted.
+
+## Directory Structure
+
+When both profiles are installed, your Bluelink directory will contain CLI binaries for each profile:
+
+<InstallBluelink matchPlatform="mac">
+
+```
+~/.bluelink/
+├── bin/
+│   ├── bluelink           # Bluelink CLI (bluelink profile)
+│   ├── celerity           # Celerity CLI (celerity profile)
+│   ├── deploy-engine      # Deploy Engine (shared)
+│   └── blueprint-ls       # Language Server (shared)
+├── config/                # CLI configuration
+├── engine/
+│   ├── plugins/           # All plugins from installed profiles
+│   └── state/             # Deployment state
+└── manifest.json          # Tracks installed profiles and versions
+```
+
+</InstallBluelink>
+
+<InstallBluelink matchPlatform="linux">
+
+```
+~/.bluelink/
+├── bin/
+│   ├── bluelink           # Bluelink CLI (bluelink profile)
+│   ├── celerity           # Celerity CLI (celerity profile)
+│   ├── deploy-engine      # Deploy Engine (shared)
+│   └── blueprint-ls       # Language Server (shared)
+├── config/                # CLI configuration
+├── engine/
+│   ├── plugins/           # All plugins from installed profiles
+│   └── state/             # Deployment state
+└── manifest.json          # Tracks installed profiles and versions
+```
+
+</InstallBluelink>
+
+<InstallBluelink matchPlatform="windows">
+
+```
+%LOCALAPPDATA%\NewStack\Bluelink\
+├── bin\
+│   ├── bluelink.exe           # Bluelink CLI (bluelink profile)
+│   ├── celerity.exe           # Celerity CLI (celerity profile)
+│   ├── deploy-engine.exe      # Deploy Engine (shared)
+│   └── blueprint-ls.exe       # Language Server (shared)
+├── config\                    # CLI configuration
+├── engine\
+│   ├── plugins\               # All plugins from installed profiles
+│   └── state\                 # Deployment state
+└── manifest.json              # Tracks installed profiles and versions
+```
+
+</InstallBluelink>
+
+<InstallBluelink isDefault>
+
+```
+~/.bluelink/
+├── bin/
+│   ├── bluelink           # Bluelink CLI (bluelink profile)
+│   ├── celerity           # Celerity CLI (celerity profile)
+│   ├── deploy-engine      # Deploy Engine (shared)
+│   └── blueprint-ls       # Language Server (shared)
+├── config/                # CLI configuration
+├── engine/
+│   ├── plugins/           # All plugins from installed profiles
+│   └── state/             # Deployment state
+└── manifest.json          # Tracks installed profiles and versions
+```
+
+</InstallBluelink>
+
+## Coexistence
+
+Profiles coexist cleanly on the same machine. Installing the Celerity profile alongside Bluelink does not affect the Bluelink CLI or its configuration. The `bluelink` and `celerity` binaries are separate executables that share the same Deploy Engine.
+
+Both CLIs communicate with the same Deploy Engine instance, which manages plugins from all installed profiles. The Blueprint Language Server is also shared and provides diagnostics, validation and auto-complete for blueprint files in editors through extensions such as the [Bluelink VSCode extension](https://marketplace.visualstudio.com/items?itemName=NewStack.bluelink).

@@ -321,6 +321,35 @@ This can only be set as a command line flag, environment variable or configurati
 It is not an option in the interactive prompts for the validate command.
 </Callout>
 
+### `--transform-spec`
+
+**Environment Variable**: `BLUELINK_CLI_VALIDATE_TRANSFORM_SPEC`
+
+**Configuration Key**: `validateTransformSpec`
+
+**Type**: `boolean`
+
+**Default Value**: `true`
+
+Run transformer plugins during validation so abstract resources are expanded into concrete resources for richer diagnostics.
+Required for transformer-driven workflows to produce meaningful validation output.
+When set to `false`, validation runs against the blueprint without transformation.
+
+### `--validate-after-transform`
+
+**Environment Variable**: `BLUELINK_CLI_VALIDATE_AFTER_TRANSFORM`
+
+**Configuration Key**: `validateValidateAfterTransform`
+
+**Type**: `boolean`
+
+**Default Value**: `false`
+
+After transformation, validate resources against the transformed blueprint shape.
+This catches resource-level issues that only surface once abstract resources have been expanded into their concrete forms,
+which is typically useful when diagnosing deployment-time issues.
+Has no effect unless `--transform-spec` is also `true`.
+
 ## `stage`
 
 This command is used to stage changes for a blueprint instance.

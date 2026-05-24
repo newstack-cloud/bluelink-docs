@@ -38,6 +38,7 @@ export interface WindowsInstaller {
 export interface ReleasesData {
   generatedAt: string;
   windowsInstaller: WindowsInstaller | null;
+  windowsInstallerCelerity: WindowsInstaller | null;
   'bluelink-manager': ComponentRelease[];
   cli: ComponentRelease[];
   'deploy-engine': ComponentRelease[];
@@ -69,6 +70,10 @@ export function getComponentReleases(component: ComponentKey): ComponentRelease[
 
 export function getWindowsInstaller(): WindowsInstaller | null {
   return releasesData?.windowsInstaller ?? null;
+}
+
+export function getWindowsInstallerCelerity(): WindowsInstaller | null {
+  return releasesData?.windowsInstallerCelerity ?? null;
 }
 
 export function formatBytes(bytes: number): string {

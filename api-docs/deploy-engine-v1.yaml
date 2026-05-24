@@ -1550,6 +1550,29 @@ components:
           $ref: "#/components/schemas/BlueprintLocationMetadata"
         config:
           $ref: "#/components/schemas/Config"
+        loaderConfig:
+          $ref: "#/components/schemas/ValidationLoaderConfig"
+
+    ValidationLoaderConfig:
+      type: object
+      description: |
+        Opt-in overrides to the validation loader's default behaviour
+        for a single request.
+      properties:
+        transformSpec:
+          type: boolean
+          default: false
+          description: |
+            Run transformer plugins during validation so abstract
+            resources are expanded into concrete resources for richer
+            diagnostics.
+        validateAfterTransform:
+          type: boolean
+          default: false
+          description: |
+            After transformation, validate resources against the
+            transformed blueprint shape. Has no effect unless
+            `transformSpec` is also `true`.
 
     BlueprintValidation:
       type: object
@@ -1714,6 +1737,17 @@ components:
             This means the changes described in this event may not be applied
             if the condition evaluates to false when the blueprint is deployed.
           example: false
+        removalPolicy:
+          type: string
+          description: |
+            Populated for removed resources (`removed` is true) to indicate whether
+            the resource's underlying infrastructure will be destroyed (`delete`,
+            the default) or left untouched (`retain`).
+            Omitted for non-removal changes.
+          enum:
+            - delete
+            - retain
+          example: retain
         timestamp:
           type: integer
           description: The unix timestamp of the event in seconds.
@@ -3506,6 +3540,7 @@ components:
         - newResources
         - resourceChanges
         - removedResources
+        - retainedResources
         - removedLinks
         - newChildren
         - childChanges
@@ -3530,11 +3565,24 @@ components:
             $ref: "#/components/schemas/ResourceChanges"
         removedResources:
           type: array
-          description: The names of resources that will be removed when deploying the changes.
+          description: |
+            The names of resources that will be removed when deploying the changes.
+            These are resources with a `delete` removal policy (the default)
+            whose underlying infrastructure will be destroyed.
           items:
             type: string
             description: The name of the resource that will be removed.
             example: my-old-resource
+        retainedResources:
+          type: array
+          description: |
+            The names of resources that will be removed from the blueprint's
+            managed state without destroying the underlying infrastructure.
+            These are resources with a `retain` removal policy.
+          items:
+            type: string
+            description: The name of the resource that will be retained.
+            example: my-retained-resource
         removedLinks:
           type: array
           description: |
@@ -3957,8 +4005,9 @@ components:
             - Create Interrupted (13) - The status used when a resource creation was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state of the resource is unknown and needs reconciliation.
             - Update Interrupted (14) - The status used when a resource update was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state of the resource is unknown and needs reconciliation.
             - Destroy Interrupted (15) - The status used when a resource destruction was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state of the resource is unknown and needs reconciliation.
+            - Retained (16) - The status used when a resource has been removed from the blueprint's managed state without destroying the underlying infrastructure, as a result of the resource having a removal policy of `retain`.
           example: 2
-          enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+          enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
         preciseStatus:
           type: integer
           description: |
@@ -3992,6 +4041,7 @@ components:
             - Create Interrupted (23) - The precise status used when a resource creation was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state of the resource is unknown and needs reconciliation.
             - Update Interrupted (24) - The precise status used when a resource update was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state of the resource is unknown and needs reconciliation.
             - Destroy Interrupted (25) - The precise status used when a resource destruction was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state of the resource is unknown and needs reconciliation.
+            - Retained (26) - The precise status used when a resource has been removed from the blueprint's managed state without destroying the underlying infrastructure, as a result of the resource having a removal policy of `retain`.
           example: 3
           enum:
             [
@@ -4021,6 +4071,7 @@ components:
               23,
               24,
               25,
+              26,
             ]
         lastStatusUpdateTimestamp:
           type: integer
@@ -4100,6 +4151,19 @@ components:
             type: string
             description: The reason why the resource deployment has failed.
             example: The resource could not be created because the IAM role does not exist.
+        removalPolicy:
+          type: string
+          description: |
+            The removal policy associated with the resource in the source blueprint.
+            Controls what happens to the underlying infrastructure when the resource
+            is removed from the blueprint: `delete` (the default) destroys it, while
+            `retain` removes it from the blueprint's managed state without touching
+            the provider-owned resource.
+            Omitted if the resource does not declare a removal policy.
+          enum:
+            - delete
+            - retain
+          example: retain
         drifted:
           type: boolean
           description: |
@@ -5490,6 +5554,8 @@ components:
             removedOutboundLinks: []
         removedResources:
           - my-old-resource
+        retainedResources:
+          - my-retained-resource
         removedLinks:
           - my-old-link
         newChildren:
