@@ -1,38 +1,43 @@
 import { CloudIcon, RectangleGroupIcon } from '@heroicons/react/20/solid'
-import { BlocksIcon, CodeIcon, ToolCaseIcon } from 'lucide-react'
+import { BlocksIcon, CodeIcon, ToolCaseIcon, LinkIcon } from 'lucide-react'
 import Link from 'next/link'
 
 const features = [
     {
-        name: 'IaC Simplified',
+        name: 'Links, Not Plumbing',
         description: (
             <>
-                Bluelink makes it much easier to define your infrastructure.
-                Blueprints provider powerful link abstracts where details such as networking and permissions
-                are taken care of while following industry best practices.
+                Define your resources and declare how they connect.
+                Bluelink derives the networking, permissions and IAM around them
+                following industry best practices, so you never hand-write the plumbing
+                that other IaC tools require you to maintain.
             </>
         ),
-        icon: CodeIcon,
+        icon: LinkIcon,
     },
     {
-        name: 'Define Your Primitives',
+        name: 'Build Your Own Primitives',
         description: (
             <>
-                Bluelink supports transformer plugins in addition to the typical providers found commonly in IaC tools.
-                Transformers allow plugin developers to define high level primitives with natively supported abstract
-                resources such as the multi-cloud primitives found in the <a href="https://celerityframework.io" className="text-blue-600 dark:text-blue-400">Celerity</a> project.
+                Alongside the usual providers, transformers let you and other
+                plugin authors define high level building blocks on top of raw cloud resources,
+                like <a href="https://celerityframework.io" className="text-blue-600 dark:text-blue-400">Celerity&apos;s</a> portable multi-cloud primitives.
+                <br />
+                <br />
+                Your team composes meaningful components instead of wiring providers
+                together by hand.
             </>
         ),
         icon: BlocksIcon,
     },
     {
-        name: 'First-class Tooling',
+        name: 'Tooling That Keeps Up',
         description: (
             <>
-                Bluelink comes with everything you need to set you up for success with your IaC projects,
-                including a delightful CLI and a language server that integrates with your editor of choice.
-                These tools have a tight integration with provider and transformer plugins used for your projects
-                that will set you in the right direction.
+                Bluelink ships with a delightful CLI and an editor
+                language server that understand your providers and transformers,
+                giving you autocomplete, validation and documentation as you write.
+                The tooling stays in step with the plugins your project actually uses.
             </>
         ),
         icon: ToolCaseIcon,
@@ -46,10 +51,7 @@ export default function Features() {
                 <div className="mx-auto max-w-2xl lg:text-center">
                     <h2 className="text-base/7 font-semibold text-blue-600 dark:text-blue-400" id="features">removing burdens</h2>
                     <p className="mt-2 text-pretty text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl lg:text-balance dark:text-white">
-                        Networking and permissions figured out for you
-                    </p>
-                    <p className="mt-6 text-lg/8 text-gray-600 dark:text-gray-300">
-                        Define your infrastructure in code, link key resources together and let Bluelink handle the rest.
+                        How Bluelink works
                     </p>
                 </div>
                 <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-none">

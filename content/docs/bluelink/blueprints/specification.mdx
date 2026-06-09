@@ -20,7 +20,7 @@ For example, this could abstract away a significant portion of dealing with perm
 The purpose of the blueprint specification and supporting implementations is to provide the backbone of scalable
 code and infrastructure deployment tools and to be a part of an ecosystem of composable tools that super charge developers to deliver high quality products and services at a fast pace.
 
-A blueprint can either be in JWCC ([JSON with Commas and Comments](https://nigeltao.github.io/blog/2021/json-with-commas-comments.html)) or YAML format.
+A blueprint can either be in the [Blueprint Language](/docs/bluelink/blueprints/language), JWCC ([JSON with Commas and Comments](https://nigeltao.github.io/blog/2021/json-with-commas-comments.html)) or YAML format.
 The JWCC format is a JSON-based format that allows for comments and trailing commas, making it easier to read and write for the purpose of configuration.
 The `.jsonc` extension is typically used for JWCC files, and is the recommended extension to be used with implementations of this spec.
 
@@ -99,6 +99,38 @@ For more information about referencing variables, see the [references](#referenc
 mapping[name(string), [variableDefinition](#variabledefinition)]
 
 **example**
+
+Blueprint Language
+
+```blueprintlang
+variable databaseHost: string {
+    description = "The host of the database"
+}
+
+variable databasePort: integer {
+    description = "The port of the database"
+}
+
+variable databaseUser: string {
+    description = "The user of the database to connect with"
+}
+
+variable databasePassword: string {
+    description = "The password of the user to connect to the database with"
+    secret = true
+}
+
+variable instanceSize: aws/ec2/instanceSize {
+    default = "t3.micro"
+    description = "The size of the instance to use for the service"
+}
+
+variable deploymentTarget: string {
+    default = "container"
+    allowedValues = ["container", "cloudFunctions"]
+    description = "Whether the application should be deployed as a containerised service or cloud functions"
+}
+```
 
 JSON With Commas and Comments
 
@@ -223,7 +255,7 @@ ${values.[valueName]}
 For more information about referencing values, see the [references](#references--substitutions) section.
 
 <Callout title="Tip" type="info">
-Exports can not carry out any computation for the `field` property as it is a reference to a value that is **not** a part of a `${..}` substitution. Functions can only be called in `${..}` substitutions.
+Exports can not carry out any computation for the `field` property. The canonical schema treats `field` as a pure path, so function calls and computed expressions are not accepted in any of the three formats: in YAML and JWCC, the `field` value is a plain string path and cannot contain a `${..}` substitution; in the blueprint language, `field` accepts a bare reference such as `resources.s3Bucket.spec.name` but not a function call or operator expression. Functions are otherwise available everywhere expressions are: inside `${..}` in YAML and JWCC, and as bare expressions in the blueprint language.
 
 To get around this limitation, you can use a value to store the computed value and then reference the value in the exports definition.
 </Callout>
@@ -233,6 +265,18 @@ To get around this limitation, you can use a value to store the computed value a
 mapping[string, [valueDefinition](#valuedefinition)]
 
 **example**
+
+Blueprint Language
+
+```blueprintlang
+value s3BucketNames: array {
+    value = list(
+        resources.s3Bucket1.spec.name,
+        resources.s3Bucket2.spec.name,
+        resources.s3Bucket3.spec.name
+    )
+}
+```
 
 JSON with Commas and Comments
 
@@ -261,6 +305,30 @@ values:
       )}
 ```
 
+Blueprint Language Static Object
+
+```blueprintlang
+value logsPolicyDoc: object {
+    value = {
+        policyName = "LambdaExecutionPolicy",
+        policyDocument = {
+            Version = "2012-10-17",
+            Statement = [
+                {
+                    Effect = "Allow",
+                    Action = [
+                        "logs:CreateLogGroup",
+                        "logs:CreateLogStream",
+                        "logs:PutLogEvents"
+                    ],
+                    Resource = "*"
+                }
+            ]
+        }
+    }
+}
+```
+
 YAML Static Object
 
 ```yaml
@@ -278,6 +346,17 @@ values:
               - "logs:CreateLogStream"
               - "logs:PutLogEvents"
             Resource: "*"
+```
+
+Blueprint Language Static Array
+
+```blueprintlang
+value allowedOrigins: array {
+    value = [
+        "https://example.com",
+        "https://another-example.com"
+    ]
+}
 ```
 
 YAML Static Array
@@ -342,6 +421,22 @@ mapping[string, [datasourceDefinition](#datasourcedefinition)]
 
 **example**
 
+Blueprint Language
+
+```blueprintlang
+data network: aws/vpc {
+    metadata {
+        displayName = "Network source"
+    }
+
+    filter "tags" has key variables.environment
+
+    export subnets: array
+    export securityGroups: array
+    export vpcId as vpc: string
+}
+```
+
 JSON with Commas and Comments
 
 ```javascript
@@ -398,6 +493,23 @@ datasources:
         aliasFor: vpcId
 ```
 
+Blueprint Language with multiple filters
+
+```blueprintlang
+data network: aws/vpc {
+    metadata {
+        displayName = "Network source"
+    }
+
+    filter "tags" has key variables.environment
+    filter "region" in variables.awsRegions
+
+    export subnets: array
+    export securityGroups: array
+    export vpcId as vpc: string
+}
+```
+
 YAML with multiple filters
 
 ```yaml
@@ -421,6 +533,21 @@ datasources:
       vpc:
         type: string
         aliasFor: vpcId
+```
+
+Blueprint Language exporting all fields
+
+```blueprintlang
+data network: aws/vpc {
+    metadata {
+        displayName = "Network source"
+    }
+
+    filter "tags" has key variables.environment
+    filter "region" in variables.awsRegions
+
+    export *
+}
 ```
 
 YAML exporting all fields
@@ -466,6 +593,44 @@ At least one resource must be defined in a blueprint if there are no [includes](
 mapping[string, [resourceDefinition](#resourcedefinition)]
 
 **example**
+
+Blueprint Language
+
+```blueprintlang
+resource saveOrderFunction: aws/lambda/function {
+    description = "The function responsible for saving a new order to the system."
+
+    metadata {
+        displayName = "Save Order Function"
+        annotations = {
+            "aws.lambda.function.populateEnvVars" = true
+        }
+    }
+
+    select by label {
+        service = "ordersApi"
+    }
+
+    spec {
+        functionName = "ordersApi-${variables.environment}-saveOrderFunction-v1"
+        codeUri = "./orders"
+        handler = "save_order.handler"
+        runtime = "python3.9"
+        tracing = "Active"
+        architectures = "arm64"
+        environment = {
+            variables = {
+                DATABASE_HOST = variables.databaseHost,
+                DATABASE_PORT = variables.databasePort,
+                DATABASE_USER = variables.databaseUser,
+                DATABASE_PASSWORD = variables.databasePassword,
+                DATABASE_NAME = variables.databaseName
+            }
+        }
+        timeout = 120
+    }
+}
+```
 
 JSON with Commas and Comments
 
@@ -563,6 +728,36 @@ mapping[string, [includeDefinition](#includedefinition)]
 
 **example**
 
+Blueprint Language
+
+```blueprintlang
+include coreInfra "core-infra.yaml" {
+    description = "core infra (including database) for the Orders API"
+
+    variables {
+        databaseName = variables.databaseName
+    }
+
+    metadata {
+        sourceType = "aws/s3"
+        bucket = "order-system-blueprints"
+        region = "eu-west-1"
+    }
+}
+
+include ordersApi "api.yaml" {
+    description = "The stack for the Orders API"
+
+    variables {
+        databaseHost = children.coreInfra.databaseHost
+        databasePort = children.coreInfra.databasePort
+        databaseUser = children.coreInfra.databaseUser
+        databasePassword = children.coreInfra.databasePassword
+        databaseName = variables.databaseName
+    }
+}
+```
+
 JSON with Commas and Comments
 
 ```javascript
@@ -632,6 +827,20 @@ mapping[string, [exportDefinition](#exportdefinition)]
 
 **example**
 
+Blueprint Language
+
+```blueprintlang
+export saveOrdersFunctionArn: string {
+    description = "The ARN of the function used to save orders to the system."
+    field = resources.saveOrdersFunction.spec.functionArn
+}
+
+export saveOrdersFunctionName: string {
+    description = "The name of the function used to save orders to the system."
+    field = resources.saveOrdersFunction.spec.functionName
+}
+```
+
 JSON with Commas and Comments
 
 ```javascript
@@ -678,6 +887,15 @@ mapping[string, ( string | object | array | boolean | float | integer ) ]
 
 **example**
 
+Blueprint Language
+
+```blueprintlang
+metadata {
+    "function.builder" = "ESM"
+    "function.builder.minify" = false
+}
+```
+
 JSON with Commas and Comments
 
 ```javascript
@@ -708,15 +926,17 @@ The name of the variable is not in this definition as it is the key in the mappi
 The custom type (`{customType}`) referenced in the variable fields is a type defined by a specific provider in an implementation of the spec
 that exists for convenience when dealing with variables with a large set of fixed possible values.
 
-A custom variable type must be of the format `{provider}/{type}`.
+A custom variable type must be of the format `{provider}/{type}` or `{provider}/{service}/{type}`.
 An example of a custom variable type would be `aws/region` with a fixed set of supported AWS regions served by an AWS resource provider.
 
 With custom types, labels should be used as references to the values of the variable instead of the values themselves. Custom types should be treated as enums.
 
 <Callout title="Tip" type="info">
-Only scalar values are supported for variables. If you want to pass in complex structures such as arrays or objects, you will need to pass them in as strings and use the `jsondecode` function in a substitution to interact with the array or object structure.
+Only scalar values are supported for variables. To pass in a complex structure such as an array or object, encode it as a JSON string and decode it with the `jsondecode` function. In YAML and JWCC the call is written inside a `${..}` substitution; in the blueprint language it is written as a bare expression.
 
-For example, if you are using a provider with a custom function that takes a specific object structure as input you would do the following:
+For example, calling a provider's custom function that takes a specific object structure as input would look like the following.
+
+YAML and JWCC:
 
 ```
 ${custom_provider_function(
@@ -724,7 +944,22 @@ ${custom_provider_function(
 )}
 ```
 
-Where `variables.deploymentConfig` would be a serialised JSON string defined in:
+Blueprint Language:
+
+```
+custom_provider_function(jsondecode(variables.deploymentConfig))
+```
+
+Where `variables.deploymentConfig` would be a serialised JSON string defined in the blueprint language:
+
+```blueprintlang
+variable deploymentConfig: string {
+    default = "{\"replicas\": 3, \"memory\": 512}"
+    description = "The deployment configuration for the service"
+}
+```
+
+Or in YAML:
 
 ```yaml
 variables:
@@ -840,6 +1075,44 @@ The computed or static value that can be accessed from other values, resources, 
 string | integer | float | boolean | object | array
 
 **examples**
+
+Blueprint Language
+
+```
+list(
+    resources.s3Bucket1.spec.name,
+    resources.s3Bucket2.spec.name,
+    resources.s3Bucket3.spec.name
+)
+```
+
+`"t3.micro"`
+
+`variables.databaseHost`
+
+`normalize(values.s3BucketNames)`
+
+```
+{
+    policyName = "LambdaExecutionPolicy",
+    policyDocument = {
+        Version = "2012-10-17",
+        Statement = [
+            {
+                Effect = "Allow",
+                Action = [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                ],
+                Resource = "*"
+            }
+        ]
+    }
+}
+```
+
+Substitution (YAML and JWCC)
 
 ```
 ${list(
@@ -1087,10 +1360,13 @@ A definition of an exported field from a data source that is exposed to resource
 a blueprint.
 
 <Callout title="Tip" type="info">
-As only primitive values and primitive arrays are supported, data source developers should model complex data structures using field names such as `loggingConfig.applicationLogLevel` to represent nested fields in the data source object or populate exported data source fields with JSON-encoded strings that can be parsed in blueprints using the [`jsondecode`](/docs/blueprint/core-functions#jsondecode) function in a `${..}` substitution.
+As only primitive values and primitive arrays are supported, data source developers should model complex data structures using field names such as `loggingConfig.applicationLogLevel` to represent nested fields in the data source object, or populate exported data source fields with JSON-encoded strings that can be parsed in blueprints using the [`jsondecode`](/docs/blueprint/core-functions#jsondecode) function. In YAML and JWCC, the call is written inside a `${..}` substitution; in the blueprint language, it is a bare expression on the right-hand side of a field assignment.
 
-When using names with dot notation to represent nested fields, you will need to reference the field like so:
+When using names with dot notation to represent nested fields, the bracket accessor is required. In YAML and JWCC the reference is wrapped in `${..}`:
 `${datasources.myFunction["loggingConfig.applicationLogLevel"]}`
+
+In the blueprint language the same reference is written bare:
+`datasources.myFunction["loggingConfig.applicationLogLevel"]`
 
 This is due to `.` being a reserved character to access data from multiple blueprint element types such as resources, data sources and values.
 </Callout>
@@ -1193,13 +1469,12 @@ ___
 Condition provides a way to conditionally create resources based on the state of other resources,
 variables, values or data sources in the blueprint.
 
-The condition can be defined in 2 ways. 1, as a boolean expression in a `${..}` substitution that evaluates to `true` or `false`; 2, as a condition object that allows conditions to be combined with `and`, `or` and `not` operators.
+The condition can be defined in 2 ways. 1, as a boolean expression that evaluates to `true` or `false`; 2, as a condition object that allows conditions to be combined with `and`, `or` and `not` operators. In YAML and JWCC, the boolean expression is wrapped in a `${..}` substitution (for example, `${eq(variables.deploymentTarget, "serverless")}`); in the blueprint language, the same condition is written as a bare expression using the infix operators (`variables.deploymentTarget == "serverless"`). Both lower to the same canonical schema.
 
 <Callout title="Tip" type="info">
-`${..}` substitutions can also support more complex logical expression utilising the `and`, `or` and
-`not` functions. 
+In YAML and JWCC, more complex logical expressions are built inside `${..}` with the `and`, `or` and `not` functions. The blueprint language exposes the same operators as infix `&&`, `||` and prefix `!`.
 
-For example:
+YAML and JWCC:
 
 ```
 ${or(
@@ -1207,9 +1482,49 @@ ${or(
   eq(variables.deploymentTarget, "cloudFunctions")
 )}
 ```
+
+Blueprint Language:
+
+```
+variables.deploymentTarget == "container" || variables.deploymentTarget == "cloudFunctions"
+```
 </Callout>
 
 An example of a condition for a resource would be:
+
+Blueprint Language
+
+```blueprintlang
+resource saveOrderFunction: aws/lambda/function {
+    condition = {
+        and = [
+            variables.deploymentTarget == "serverless",
+            variables.environment == "production"
+        ]
+    }
+
+    spec {
+        functionName = "ordersApi-${variables.environment}-saveOrderFunction-v1"
+        codeUri = "./orders"
+        handler = "save_order.handler"
+        runtime = "python3.12"
+        tracing = "Active"
+        architectures = "arm64"
+        environment = {
+            variables = {
+                DATABASE_HOST = variables.databaseHost,
+                DATABASE_PORT = variables.databasePort,
+                DATABASE_USER = variables.databaseUser,
+                DATABASE_PASSWORD = variables.databasePassword,
+                DATABASE_NAME = variables.databaseName
+            }
+        }
+        timeout = 120
+    }
+}
+```
+
+YAML
 
 ```yaml
 resources:
@@ -1244,19 +1559,45 @@ ___
 
 <FieldHeading fieldName="each" />
 
-Provides a way to create multiple resources based on a list of values that can be referenced in the blueprint. The current item in the list can be accessed by referencing `elem` in a `${..}` substitution. The current index can be accessed by referencing `i` in a `${..}` substitution.
+Provides a way to create multiple resources based on a list of values that can be referenced in the blueprint. The current item in the list is referenced as `elem`, and the current index as `i`. In YAML and JWCC, both are read inside a `${..}` substitution (`${elem.bucketName}`, `${i}`); in the blueprint language, they are bare references inside a `foreach` body (`elem.bucketName`, `i`). In the blueprint language the `each` field itself is written as the `foreach <expression>` inline statement.
 
 See the [references](#references--substitutions) section for more information on how to reference the current item (`elem`) and current index (`i`) in the each array.
 
 <Callout title="Tip" type="info">
-`each` does not support substitution references that resolve to objects or mappings, you can do the following to feed an object into an `each`:
+`each` does not accept a value that resolves to an object or mapping. To feed an object's values into `each`, unwrap them with `vals`:
+
+YAML and JWCC:
 
 ```
 ${vals(values.bucketsConfig)}
 ```
+
+Blueprint Language:
+
+```blueprintlang
+foreach vals(values.bucketsConfig)
+```
 </Callout>
 
 An example of using `each` for a resource would be:
+
+Blueprint Language
+
+```blueprintlang
+resource s3Buckets: aws/s3/bucket {
+    foreach values.bucketsToCreate
+
+    spec {
+        bucketName = elem.bucketName
+        objectLockEnabled = elem.objectLockEnabled
+        tags = [
+            { key = "bucketNumber", value = "bucket-${i}" }
+        ]
+    }
+}
+```
+
+YAML
 
 ```yaml
 resources:
@@ -1330,6 +1671,26 @@ The value must be a static literal. Substitutions (`${..}`) are **not** supporte
 
 An example of using `removalPolicy` for a resource would be:
 
+Blueprint Language
+
+```blueprintlang
+resource ordersTable: aws/dynamodb/table {
+    removalPolicy = "retain"
+
+    spec {
+        tableName = "orders"
+        attributeDefinitions = [
+            { attributeName = "order_id", attributeType = "N" }
+        ]
+        keySchema = [
+            { attributeName = "order_id", keyType = "HASH" }
+        ]
+    }
+}
+```
+
+YAML
+
 ```yaml
 resources:
   ordersTable:
@@ -1360,6 +1721,22 @@ ___
 The specification for the resource that will be used to create/update and synchronise blueprint lifecylce state with the resource in the provider.
 
 An example for a cloud function resource spec in AWS would be the spec object in the following:
+
+Blueprint Language
+
+```blueprintlang
+resource saveOrderFunction: aws/lambda/function {
+    spec {
+        codeUri = "./orders"
+        handler = "save_order.handler"
+        runtime = "python3.9"
+        tracing = "Active"
+        timeout = 120
+    }
+}
+```
+
+YAML
 
 ```yaml
   saveOrderFunction:
@@ -1440,6 +1817,93 @@ For example, let's create a scenario where you have a serverless application tha
 In this scenario you have some lambda functions that need to talk to a DynamoDB table and a Secrets Manager store.
 In the blueprint specification, in order to make the DynamoDB table and SecretsManager store available to the cloud functions,
 you will set a shared label on the DynamoDB table and SecretsManager store and then set a selector on the cloud functions like the following.
+
+Blueprint Language
+
+```blueprintlang
+resource ordersTable: aws/dynamodb/table {
+    metadata {
+        labels = {
+            displayName = "Orders Table",
+            service = "ordersApi"
+        }
+    }
+
+    spec {
+        attributeDefinitions = [
+            { attributeName = "order_id",   attributeType = "N" },
+            { attributeName = "product_id", attributeType = "N" },
+            { attributeName = "amount",     attributeType = "N" }
+        ]
+        keySchema = [
+            { attributeName = "order_id",   keyType = "HASH" },
+            { attributeName = "product_id", keyType = "RANGE" }
+        ]
+        tableName = "orders"
+    }
+}
+
+resource ordersSecrets: aws/secretsmanager/secret {
+    metadata {
+        displayName = "Orders Secrets"
+        labels = {
+            displayName = "Orders Secrets",
+            service = "ordersApi"
+        }
+    }
+
+    spec {
+        secretName = "ordersApi"
+    }
+}
+
+resource getOrdersFunction: aws/lambda/function {
+    metadata {
+        displayName = "Get Orders Function"
+        # A hypothetical annotation that indicates that
+        # each resource that meets the criteria of the link selector
+        # should be made available to the lambda function as an environment variable.
+        annotations = {
+            "aws.lambda.function.populateEnvVars" = true
+        }
+    }
+
+    select by label {
+        service = "ordersApi"
+    }
+
+    spec {
+        codeUri = "./orders"
+        handler = "get_orders.handler"
+        runtime = "python3.9"
+        tracing = "Active"
+        timeout = 120
+    }
+}
+
+resource saveOrderFunction: aws/lambda/function {
+    metadata {
+        displayName = "Save Order Function"
+        annotations = {
+            "aws.lambda.function.populateEnvVars" = true
+        }
+    }
+
+    select by label {
+        service = "ordersApi"
+    }
+
+    spec {
+        codeUri = "./orders"
+        handler = "save_order.handler"
+        runtime = "python3.9"
+        tracing = "Active"
+        timeout = 120
+    }
+}
+```
+
+YAML
 
 ```yaml
 resources:
@@ -1617,6 +2081,63 @@ Substitutions are not allowed in exclude values. The values must be literal reso
 
 **Example usage:**
 
+Blueprint Language
+
+```blueprintlang
+# Links to all resources with app = orders EXCEPT testOrdersTable
+resource saveOrderFunction: aws/lambda/function {
+    select by label {
+        app = "orders"
+        exclude = [testOrdersTable]
+    }
+
+    spec {
+        handler = "save_order.handler"
+        runtime = "python3.9"
+    }
+}
+
+# This lambda excludes a different resource
+resource sendOrderNotification: aws/lambda/function {
+    select by label {
+        app = "orders"
+        exclude = [ordersTable]
+    }
+
+    spec {
+        handler = "send_notification.handler"
+        runtime = "python3.9"
+    }
+}
+
+# Target resources, both have the app = orders label
+resource ordersTable: aws/dynamodb/table {
+    metadata {
+        labels = {
+            app = "orders"
+        }
+    }
+
+    spec {
+        tableName = "orders"
+    }
+}
+
+resource testOrdersTable: aws/dynamodb/table {
+    metadata {
+        labels = {
+            app = "orders"
+        }
+    }
+
+    spec {
+        tableName = "test_orders"
+    }
+}
+```
+
+YAML
+
 ```yaml
 resources:
   # Links to all resources with app: orders EXCEPT testOrdersTable
@@ -1693,6 +2214,15 @@ Relative path example:
 -- child-blueprint.yaml
 ```
 
+Blueprint Language
+
+```blueprintlang
+# main-blueprint.bp
+include child "child-blueprint.yaml" {}
+```
+
+YAML
+
 ```yaml
 # main-blueprint.yaml
 include:
@@ -1711,6 +2241,15 @@ Working directory path example:
 ---- child-blueprint.yaml
 ```
 
+Blueprint Language
+
+```blueprintlang
+# app_infra/main-blueprint.bp
+include child "${cwd()}/core_infra/child-blueprint.yaml" {}
+```
+
+YAML
+
 ```yaml
 # app_infra/main-blueprint.yaml
 include:
@@ -1719,6 +2258,21 @@ include:
 ```
 
 Remote file system example:
+
+Blueprint Language
+
+```blueprintlang
+# main-blueprint.bp
+include coreInfrastructure "core-infra-2025-11-02.yaml" {
+    metadata {
+        sourceType = "aws/s3"
+        bucket = "order-system-blueprints"
+        region = "eu-west-1"
+    }
+}
+```
+
+YAML
 
 ```yaml
 # main-blueprint.yaml
@@ -1980,15 +2534,23 @@ In these cases the filter operation should fail and the implementation should re
 
 <br/>
 
+## Blueprint Language
+
+This specification supports YAML, JWCC and a first-class configuration language for blueprints tailored towards authoring blueprints. All three formats map to the same canonical schema, so a blueprint authored in any of them is semantically equivalent in the others. Where YAML and JWCC embed the substitution language inside `${..}` strings, the blueprint language treats expressions as first-class: references, function calls, and infix operators (`==`, `!=`, `<`, `<=`, `>`, `>=`, `&&`, `||`, `!`) are written directly as field values, and `${..}` is reserved for interpolation inside a string literal.
+
+[Blueprint Language Spec](/docs/bluelink/blueprints/language)
+
+<br/>
+
 ## References & Substitutions
 
-In a blueprint, references are ways to access values from a number of different types of objects in a blueprint.
-References can be used to make use of variables, values, resource fields, data source fields, and exported fields from child blueprints.
+In a blueprint, references are ways to access values from a number of different types of objects in a blueprint. References can be used to make use of variables, values, resource fields, data source fields, and exported fields from child blueprints.
 
-In most cases references are made with the `${..}` syntax with a few exceptions such as the export
-"field" attribute which expects a reference to be made to a resource field as a regular string.
+In YAML and JWCC, references are wrapped in the `${..}` substitution syntax, which can also apply functions to a value. The one exception is the export `field` attribute, which the canonical schema treats as a plain string path; it is written without `${..}` and accepts only a reference path, not a function call.
 
-`${..}` is a substitution that can be used for references and to apply one of a limited set of functions to a value.
+In the blueprint language, references are bare expressions and appear directly as field values (for example, `timeout = variables.timeout` and `value = list(...)`). `${..}` is still available, but only for interpolating an expression into a string literal (`"https://${variables.host}/api"`). The same export `field` restriction applies: it accepts a bare reference path, not a computed expression.
+
+The reference forms and accessors documented below are identical across all three formats; only the wrapping differs.
 
 ### Accessing Nested Fields
 
@@ -2316,12 +2878,10 @@ digit                         =   ? [0-9] ? ;
 
 ### Functions
 
-There are a set of utility functions that can be used in references when accessed
-via the `${..}` syntax.
+There are a set of utility functions that can be used wherever an expression is allowed. In YAML and JWCC, functions are called inside a `${..}` substitution (for example, `${trim(variables.name)}`); in the blueprint language, the same calls are written bare as part of an expression (`trim(variables.name)`). Both forms produce the same canonical schema.
 
 <Callout title="Caution" type="warning">
-Functions are not supported in any other context where references might be used.
-They should only ever be used inside `${..}`.
+In YAML and JWCC, functions are only accepted inside `${..}` substitutions; they are not allowed in plain string values outside a substitution. In the blueprint language, function calls are bare expressions and can appear directly as field values, inside object and array literals, or interpolated into a string with `${..}`. The export `field` attribute is the one position that does not accept a function call in any format, because the canonical schema treats it as a pure path (see the [export specification](#exportdefinition)).
 </Callout>
 
 Functions are required to be inclusive of but not limited to the set of core functions defined in the spec;
@@ -2363,11 +2923,9 @@ As displayed in the example above, multiple levels of nesting within a more comp
 References can be used to reference complex types including arrays and mappings.
 There is also the `jsondecode` function that can be used to decode a json string which will more often than not yield a complex type.
 
-Dynamic value substitution is always performed with the `${..}` syntax, this can be as a standalone string or part of a string interpolation;
-for example, `${cacheCluster.spec.config.host}` or `https://${cacheCluster.spec.config.host}:3000`.
+In YAML and JWCC, dynamic value substitution is performed with the `${..}` syntax, either as a standalone string (`${cacheCluster.spec.config.host}`) or as part of a string interpolation (`https://${cacheCluster.spec.config.host}:3000`). In the blueprint language, a reference that occupies the entire value is written bare (`cacheCluster.spec.config.host`), and `${..}` is reserved for interpolating an expression into a string literal (`"https://${cacheCluster.spec.config.host}:3000"`). All three formats resolve to the same canonical schema.
 
-In the case of a reference that yields a complex type, string interpolation isn't particularly useful and can lead to unexpected results.
-For this reason, implementations of the spec should explicitly report informative errors to the user when string interpolation is attempted on a reference that yields a complex type.
+When a reference yields a complex type, string interpolation is not particularly useful and can lead to unexpected results. For this reason, implementations of the spec should explicitly report informative errors to the user when string interpolation is attempted on a reference that yields a complex type, regardless of which format the blueprint was authored in.
 
 ### Binary Data Handling
 
@@ -2388,6 +2946,29 @@ The core functions for binary data include:
 #### Use Cases for Binary Data
 
 **Certificates and Keys:**
+
+Blueprint Language
+
+```blueprintlang
+# Local files
+resource certificate: aws/acm/certificate {
+    spec {
+        certificateBody = base64encode(file("certificates/server.pem"))
+        privateKey = base64encode(file("certificates/private.key"))
+    }
+}
+
+# Remote files
+resource certificate: aws/acm/certificate {
+    spec {
+        certificateBody = base64encode(file("s3://my-bucket/certificates/server.pem"))
+        privateKey = base64encode(file("s3://my-bucket/certificates/private.key"))
+    }
+}
+```
+
+YAML
+
 ```yaml
 # Local files
 resources:
@@ -2407,6 +2988,31 @@ resources:
 ```
 
 **Lambda Function Code:**
+
+Blueprint Language
+
+```blueprintlang
+# Local files
+resource function: aws/lambda/function {
+    spec {
+        code = {
+            zipFile = base64encode(file("dist/function.zip"))
+        }
+    }
+}
+
+# Remote files
+resource function: aws/lambda/function {
+    spec {
+        code = {
+            zipFile = base64encode(file("s3://my-bucket/dist/function.zip"))
+        }
+    }
+}
+```
+
+YAML
+
 ```yaml
 # Local files
 resources:
@@ -2426,6 +3032,29 @@ resources:
 ```
 
 **Processing Binary Data:**
+
+Blueprint Language
+
+```blueprintlang
+data certificate: aws/acm/certificate {
+    export certificateBody: string
+}
+
+# Process binary data before storing
+value certificateHash: string {
+    value = sha256(base64decode(datasources.certificate.certificateBody))
+}
+
+resource application: aws/ec2/instance {
+    spec {
+        # Use the processed certificate hash
+        certificateHash = values.certificateHash
+    }
+}
+```
+
+YAML
+
 ```yaml
 datasources:
   certificate:
@@ -2953,6 +3582,19 @@ The `none` literal value in the substitution language provides a way to explicit
 When a field's value evaluates to `none`, that field is **completely omitted** from the final materialised blueprint output:
 
 <Callout title="Example" type="info">
+Blueprint Language
+
+```blueprintlang
+resource instance: aws/ec2/instance {
+    spec {
+        instanceType = "t3.micro"
+        monitoring = if(variables.env == "prod", true, none)
+    }
+}
+```
+
+YAML
+
 ```yaml
 resources:
   instance:
@@ -2981,6 +3623,19 @@ This is fundamentally different from setting a field to an empty value like `""`
 When `none` appears within a string interpolation expression, it is **treated as an empty string** (`""`):
 
 <Callout title="Info" type="info">
+Blueprint Language
+
+```blueprintlang
+resource api: aws/apigateway/restapi {
+    spec {
+        # If customDomain is none, it becomes an empty string in the interpolation
+        url = "https://${customDomain}/api/v1"
+    }
+}
+```
+
+YAML
+
 ```yaml
 resources:
   api:
@@ -2998,6 +3653,19 @@ The field is always present for string interpolation, and `none` values simply c
 If you want to provide a default value when a variable might be `none`, use the `or()` function:
 
 <Callout title="Tip" type="info">
+Blueprint Language
+
+```blueprintlang
+resource api: aws/apigateway/restapi {
+    spec {
+        # If customDomain is none, use "localhost" instead
+        url = "https://${or(customDomain, "localhost")}/api/v1"
+    }
+}
+```
+
+YAML
+
 ```yaml
 resources:
   api:
@@ -3014,6 +3682,22 @@ Result when `customDomain` is `none`: `"https://localhost/api/v1"`
 
 When `none` values appear as elements in array literals or array-valued substitutions, they are **filtered out** from the final array:
 
+Blueprint Language
+
+```blueprintlang
+resource securityGroup: aws/ec2/securitygroup {
+    spec {
+        ingressRules = [
+            { port = 443, protocol = "tcp" },
+            if(variables.env == "dev", { port = 22, protocol = "tcp" }, none),
+            { port = 80, protocol = "tcp" }
+        ]
+    }
+}
+```
+
+YAML
+
 ```yaml
 resources:
   securityGroup:
@@ -3022,7 +3706,7 @@ resources:
       ingressRules:
         - port: 443
           protocol: tcp
-        - ${if(eq(variables.env, "dev"), {port: 22, protocol: "tcp"}, none)}
+        - ${if(eq(variables.env, "dev"), object(port=22, protocol="tcp"), none)}
         - port: 80
           protocol: tcp
 ```
@@ -3032,6 +3716,23 @@ When `variables.env` is `"prod"`, the `none` element is filtered out, resulting 
 #### None in Objects
 
 When `none` values appear as values in object/mapping literals, the corresponding key-value pair is **omitted** from the final object:
+
+Blueprint Language
+
+```blueprintlang
+resource lambda: aws/lambda/function {
+    spec {
+        functionName = "myFunction"
+        environment = {
+            NODE_ENV = variables.nodeEnv,
+            DEBUG_MODE = if(variables.env == "dev", "true", none),
+            LOG_LEVEL = "info"
+        }
+    }
+}
+```
+
+YAML
 
 ```yaml
 resources:
@@ -3051,6 +3752,20 @@ When `variables.env` is `"prod"`, the `DEBUG_MODE` key is omitted from the `envi
 
 **Conditional field presence:**
 
+Blueprint Language
+
+```blueprintlang
+# Only include tags in production
+resource bucket: aws/s3/bucket {
+    spec {
+        bucketName = "my-bucket"
+        tags = if(variables.env == "prod", values.prodTags, none)
+    }
+}
+```
+
+YAML
+
 ```yaml
 # Only include tags in production
 resources:
@@ -3062,6 +3777,20 @@ resources:
 ```
 
 **Using `coalesce()` for defaults:**
+
+Blueprint Language
+
+```blueprintlang
+# Provide default when value might be none
+resource function: aws/lambda/function {
+    spec {
+        timeout = coalesce(variables.customTimeout, 30)
+        memorySize = coalesce(variables.customMemory, 512)
+    }
+}
+```
+
+YAML
 
 ```yaml
 # Provide default when value might be none
@@ -3199,6 +3928,51 @@ The following section contains a set of examples of how you can pull in one or m
 -- app-infra.yaml
 ```
 
+`main-blueprint.bp` (Blueprint Language)
+
+```blueprintlang
+version "2025-11-02"
+
+variable orderTopicType: string {
+    default = "standard"
+    description = "The type of topic to be used for order events"
+    allowedValues = ["standard", "fifo"]
+}
+
+variable appRegion: aws/region {
+    default = "eu-west-1"
+    description = "The region in which the application will be deployed"
+}
+
+include coreInfrastructure "core-infra.yaml" {
+    variables {
+        orderTopicType = variables.orderTopicType
+    }
+}
+
+include appInfrastructure "app-infra.yaml" {
+    variables {
+        # Implementations of the spec should allow users to reference exports from
+        # included blueprints, correctly determining the order in which blueprints
+        # are executed to ensure that exports are available when they are referenced.
+        # See the include section of the spec for more information on how this should
+        # work.
+        orderTopicId = children.coreInfrastructure.ordersTopicId
+        region = variables.appRegion
+    }
+}
+
+export coreOrdersTopic: string {
+    description = "The unique identifier of the orders topic for the system"
+    field = children.coreInfrastructure.ordersTopicId
+}
+
+export apiBaseUrl: string {
+    description = "The base URL of the API for the system"
+    field = children.appInfrastructure.apiBaseUrl
+}
+```
+
 `main-blueprint.yaml`
 
 ```yaml
@@ -3251,6 +4025,31 @@ exports:
 
 ```
 
+`core-infra.bp` (Blueprint Language)
+
+```blueprintlang
+version "2025-11-02"
+
+variable orderTopicType: string {
+    default = "standard"
+    description = "The type of topic to be used for order events"
+    allowedValues = ["standard", "fifo"]
+}
+
+resource ordersTopic: aws/sns/topic {
+    description = "The topic to which order events will be published"
+
+    spec {
+        topicType = variables.orderTopicType
+    }
+}
+
+export ordersTopicId: string {
+    description = "The unique identifier of the orders topic for the system"
+    field = resources.ordersTopic.spec.id
+}
+```
+
 `core-infra.yaml`
 ```yaml
 version: 2025-11-02
@@ -3276,6 +4075,30 @@ exports:
       type: string
       description: The unique identifier of the orders topic for the system
       field: resources.ordersTopic.spec.id
+```
+
+`app-infra.bp` (Blueprint Language)
+
+```blueprintlang
+version "2025-11-02"
+
+variable region: aws/region {
+    default = "eu-west-1"
+    description = "The region in which the application will be deployed"
+}
+
+resource api: aws/api-gateway/rest-api {
+    description = "The API for the system"
+
+    spec {
+        region = variables.region
+    }
+}
+
+export apiBaseUrl: string {
+    description = "The base URL of the API for the system"
+    field = resources.api.spec.endpoint
+}
 ```
 
 `app-infra.yaml`
@@ -3315,6 +4138,58 @@ exports:
 -- core-infra
   -- topics.yaml
   -- event-bus.yaml
+```
+
+`app-infra/main-blueprint.bp` (Blueprint Language)
+
+```blueprintlang
+version "2025-11-02"
+
+variable orderTopicType: string {
+    default = "standard"
+    description = "The type of topic to be used for order events"
+    allowedValues = ["standard", "fifo"]
+}
+
+variable appRegion: aws/region {
+    default = "eu-west-1"
+    description = "The region in which the application will be deployed"
+}
+
+# Explicitly specifying working directory removes ambiguity around how paths are resolved.
+include topics "${cwd()}/core-infra/topics.yaml" {
+    variables {
+        orderTopicType = variables.orderTopicType
+    }
+}
+
+include eventBus "${cwd()}/core-infra/event-bus.yaml" {
+    variables {
+        eventBusName = variables.eventBusName
+    }
+}
+
+include appInfrastructure "${cwd()}/app-infra/api.yaml" {
+    variables {
+        orderTopicId = children.topics.ordersTopicId
+        region = variables.appRegion
+    }
+}
+
+export coreOrdersTopic: string {
+    description = "The unique identifier of the orders topic for the system"
+    field = children.topics.ordersTopicId
+}
+
+export coreEventBus: string {
+    description = "The unique identifier of the event bus for the system"
+    field = children.eventBus.eventBusId
+}
+
+export apiBaseUrl: string {
+    description = "The base URL of the API for the system"
+    field = children.appInfrastructure.apiBaseUrl
+}
 ```
 
 `app-infra/main-blueprint.yaml`
@@ -3376,6 +4251,31 @@ exports:
 ```
 
 
+`core-infra/topics.bp` (Blueprint Language)
+
+```blueprintlang
+version "2025-11-02"
+
+variable orderTopicType: string {
+    default = "standard"
+    description = "The type of topic to be used for order events"
+    allowedValues = ["standard", "fifo"]
+}
+
+resource ordersTopic: aws/sns/topic {
+    description = "The topic to which order events will be published"
+
+    spec {
+        topicType = variables.orderTopicType
+    }
+}
+
+export ordersTopicId: string {
+    description = "The unique identifier of the orders topic for the system"
+    field = resources.ordersTopic.spec.arn
+}
+```
+
 `core-infra/topics.yaml`
 ```yaml
 version: 2025-11-02
@@ -3403,6 +4303,30 @@ exports:
       field: resources.ordersTopic.spec.arn
 ```
 
+`core-infra/event-bus.bp` (Blueprint Language)
+
+```blueprintlang
+version "2025-11-02"
+
+variable eventBus: string {
+    default = "default"
+    description = "The name of the event bus to be used for order events"
+}
+
+resource eventBus: aws/eventbridge/event-bus {
+    description = "The event bus to which order events will be published"
+
+    spec {
+        eventBusName = variables.eventBus
+    }
+}
+
+export eventBusId: string {
+    description = "The unique identifier of the event bus for the system"
+    field = resources.eventBus.spec.arn
+}
+```
+
 `core-infra/event-bus.yaml`
 ```yaml
 version: 2025-11-02
@@ -3425,6 +4349,30 @@ exports:
       type: string
       description: The unique identifier of the event bus for the system
       field: resources.eventBus.spec.arn
+```
+
+`app-infra/api.bp` (Blueprint Language)
+
+```blueprintlang
+version "2025-11-02"
+
+variable region: aws/region {
+    default = "eu-west-1"
+    description = "The region in which the application will be deployed"
+}
+
+resource api: aws/api-gateway/rest-api {
+    description = "The API for the system"
+
+    spec {
+        region = variables.region
+    }
+}
+
+export apiBaseUrl: string {
+    description = "The base URL of the API for the system"
+    field = resources.api.spec.endpoint
+}
 ```
 
 `app-infra/api.yaml`
@@ -3465,6 +4413,20 @@ Implementations are expected to implement support for remote sources using the m
 
 For example, if the remote source was an AWS S3 bucket:
 
+Blueprint Language
+
+```blueprintlang
+include coreInfrastructure "core-infra-2025-11-02.yaml" {
+    metadata {
+        sourceType = "aws/s3"
+        bucket = "order-system-blueprints"
+        region = "eu-west-1"
+    }
+}
+```
+
+YAML
+
 ```yaml
 include:
   coreInfrastructure:
@@ -3485,6 +4447,67 @@ You can find out more about this in the [include](#include) section.
 
 The following is an example of how an implementation might go about supporting blueprints as resources.
 
+Blueprint Language
+
+```blueprintlang
+version "2025-11-02"
+
+variable region: aws/region {
+    default = "eu-west-1"
+    description = "The region in which the application will be deployed"
+}
+
+variable orderTopicType: string {
+    default = "standard"
+    description = "The type of topic to be used for order events"
+    allowedValues = ["standard", "fifo"]
+}
+
+resource api: celerity/blueprint {
+    description = "The API for the system"
+
+    spec {
+        # Assuming a celerity/blueprint provider has a module system
+        # for blueprint resources.
+        module = {
+            name = "company/ordersApi",
+            version = 2.0
+        }
+        variables = {
+            region = variables.region,
+            ordersTopicId = resources.coreInfra.spec.ordersTopicId
+        }
+    }
+}
+
+resource coreInfra: celerity/blueprint {
+    description = "The core infrastructure for an orders system"
+
+    spec {
+        # Assuming a celerity/blueprint provider has a module system
+        # for blueprint resources.
+        module = {
+            name = "company/ordersCoreInfra",
+            version = 1.0
+        }
+        variables = {
+            orderTopicType = variables.orderTopicType
+        }
+    }
+}
+
+export apiBaseUrl: string {
+    description = "The base URL of the API for the system"
+    field = resources.api.spec.endpoint
+}
+
+export ordersTopicId: string {
+    description = "The unique identifier of the orders topic for the system"
+    field = resources.coreInfra.spec.ordersTopicId
+}
+```
+
+YAML
 
 ```yaml
 version: 2025-11-02

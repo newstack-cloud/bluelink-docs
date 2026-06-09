@@ -37,8 +37,8 @@ export default function Hero() {
                             Manage infrastructure as relationships
                         </h1>
                         <p className="mt-8 text-pretty text-lg font-medium text-gray-500 sm:text-xl/8 dark:text-gray-400">
-                            Bluelink simplifies infrastructure management, allowing you to focus on the important building
-                            blocks of your systems.
+                            You connect your building blocks; Bluelink generates the IAM, networking and
+                            security plumbing you would otherwise hand-write and maintain.
                         </p>
                         <div className="mt-10 flex items-center justify-center gap-x-6">
                             <Link

@@ -170,7 +170,8 @@ The name of the new blueprint project.
 **Default Value**: `yaml`
 
 The format of the blueprint file to use.
-This can be either `yaml` or `jsonc`.
+This can be `yaml`, `jsonc`, or `bp` (the blueprint language).
+Selecting `bp` scaffolds the project with a `project.bp` file.
 
 ### `--no-git`
 
@@ -282,6 +283,10 @@ Local files can be specified as a relative or absolute path to the file.
 Public URLs must start with `https://` and represent a valid URL to a blueprint file.
 Object storage bucket files must be specified in the format of `{scheme}://{bucket-name}/{object-path}`,
 where `{scheme}` is one of the following: `s3`, `gcs`, `azureblob`.
+The blueprint language (`.bp`/`.blueprint`) is supported alongside the YAML (`.yaml`/`.yml`)
+and JSON with Comments (`.jsonc`/`.json`) formats.
+When this flag is not set, an existing `project.blueprint.*` or `project.bp` file in the
+current directory is auto-detected, falling back to `project.blueprint.yaml`.
 
 ### `--check-blueprint-vars`
 
@@ -417,6 +422,10 @@ Local files can be specified as a relative or absolute path to the file.
 Public URLs must start with `https://` and represent a valid URL to a blueprint file.
 Object storage bucket files must be specified in the format of `{scheme}://{bucket-name}/{object-path}`,
 where `{scheme}` is one of the following: `s3`, `gcs`, `azureblob`.
+The blueprint language (`.bp`/`.blueprint`) is supported alongside the YAML (`.yaml`/`.yml`)
+and JSON with Comments (`.jsonc`/`.json`) formats.
+When this flag is not set, an existing `project.blueprint.*` or `project.bp` file in the
+current directory is auto-detected, falling back to `project.blueprint.yaml`.
 
 ### `--destroy`
 
@@ -565,6 +574,10 @@ Local files can be specified as a relative or absolute path to the file.
 Public URLs must start with `https://` and represent a valid URL to a blueprint file.
 Object storage bucket files must be specified in the format of `{scheme}://{bucket-name}/{object-path}`,
 where `{scheme}` is one of the following: `s3`, `gcs`, `azureblob`.
+The blueprint language (`.bp`/`.blueprint`) is supported alongside the YAML (`.yaml`/`.yml`)
+and JSON with Comments (`.jsonc`/`.json`) formats.
+When this flag is not set, an existing `project.blueprint.*` or `project.bp` file in the
+current directory is auto-detected, falling back to `project.blueprint.yaml`.
 
 The blueprint file is required for both staging (when using `--stage`) and deployment execution.
 During deployment, the source blueprint is used to resolve runtime substitutions and orchestrate the deployment process.
@@ -782,6 +795,10 @@ Local files can be specified as a relative or absolute path to the file.
 Public URLs must start with `https://` and represent a valid URL to a blueprint file.
 Object storage bucket files must be specified in the format of `{scheme}://{bucket-name}/{object-path}`,
 where `{scheme}` is one of the following: `s3`, `gcs`, `azureblob`.
+The blueprint language (`.bp`/`.blueprint`) is supported alongside the YAML (`.yaml`/`.yml`)
+and JSON with Comments (`.jsonc`/`.json`) formats.
+When this flag is not set, an existing `project.blueprint.*` or `project.bp` file in the
+current directory is auto-detected, falling back to `project.blueprint.yaml`.
 
 This flag is only effective when the `--stage` flag is set.
 

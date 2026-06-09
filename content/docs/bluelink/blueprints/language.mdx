@@ -1,0 +1,1939 @@
+---
+title: Blueprint Language
+description: The specification for the blueprint language, a first-class configuration language for authoring blueprints
+---
+
+**v2026-05-25**
+
+This document contains the specification for the blueprint language; a configuration language tailored towards
+the Bluelink blueprint model.
+
+## Overview
+
+The blueprint language expresses the same set of blueprint elements as the YAML and JWCC formats (variables,
+values, data sources, resources, includes, and exports) and maps to the same canonical schema, so a blueprint
+authored in any of the three formats is semantically equivalent in the others. It is tailored towards the
+Bluelink blueprint model.
+
+Where YAML and JWCC embed the substitution language inside `${..}` strings, the blueprint language treats
+expressions as first-class elements. References, function calls, and infix operators are written directly as field values
+without a substitution wrapper. The format is otherwise a small, structured configuration language designed to
+map cleanly onto the canonical blueprint schema.
+
+For the standardised field-level semantics of each blueprint element, see the
+[specification](/docs/bluelink/blueprints/specification). For the function reference, see
+[core functions](/docs/bluelink/blueprints/core-functions). For the link relationship model that connects
+resources together, see [links](/docs/bluelink/blueprints/links). The remainder of this document covers the
+lexical and syntactic structure of the blueprint language itself.
+
+## Example
+
+The following blueprint exercises the full feature set of the blueprint language in a single, self-contained
+Orders API blueprint.
+
+```blueprintlang
+version "2025-11-02"
+
+variable region: string {
+    default = "us-east-1"
+    description = "The region to deploy resources in"
+    allowedValues = ["us-east-1", "us-west-2", "eu-west-1"]
+}
+
+variable environment: string {
+    default = "dev"
+    description = "The deployment environment for the Orders API"
+    allowedValues = ["dev", "staging", "prod"]
+}
+
+variable databaseHost: string {
+    description = "The database host the Orders API connects to"
+}
+
+variable databasePort: integer {
+    default = 5432
+    description = "The database port the Orders API connects to"
+}
+
+variable databaseUser: string {
+    description = "The database user the Orders API connects as"
+}
+
+variable databasePassword: string {
+    description = "The database password the Orders API connects with"
+    secret = true
+}
+
+variable databaseName: string {
+    default = "orders"
+    description = "The database name for the Orders API"
+}
+
+variable instanceSize: aws/ec2/instanceSize {
+    default = "t3.micro"
+    description = "The instance size for the background batch processor."
+}
+
+variable deploymentTarget: string {
+    default = "container"
+    allowedValues = ["container", "cloudFunctions"]
+    description = "Whether the Orders API is deployed as a containerised service or as cloud functions"
+}
+
+value isProd: boolean {
+    value = variables.environment == "prod"
+}
+
+value namePrefix: string {
+    value = join(["ordersApi", variables.environment], "-")
+}
+
+value logRetentionDays: integer {
+    value = if(values.isProd, 30, 7)
+}
+
+value bucketsToCreate: array {
+    value = [
+        { name = "content",  lockObjects = false, number = 1 },
+        { name = "uploads",  lockObjects = true,  number = 2 },
+        { name = "archives", lockObjects = true,  number = 3 }
+    ]
+}
+
+value allowedOrigins: array {
+    value = [
+        "https://orders.example.com",
+        "https://admin.example.com",
+        "https://${variables.environment}.example.com"
+    ]
+}
+
+value lambdaExecutionPolicy: object {
+    value = {
+        Version = "2012-10-17",
+        Statement = [
+            {
+                Effect = "Allow",
+                Action = [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                ],
+                Resource = "*"
+            },
+            {
+                Effect = "Allow",
+                Action = ["secretsmanager:GetSecretValue"],
+                Resource = "arn:aws:secretsmanager:${variables.region}:*:secret:${values.namePrefix}-*"
+            }
+        ]
+    }
+}
+
+data network: aws/vpc {
+    metadata {
+        displayName = "Network source"
+    }
+
+    filter "tags" has key variables.environment
+    filter "state" == "available"
+
+    export subnets: array
+    export securityGroups: array {
+        description = "The security groups to associate with the service"
+    }
+    export vpcId as vpc: string
+    export cidrBlock: string
+}
+
+resource saveOrderFunction: aws/lambda/function {
+    description = """
+        The function responsible for saving a new order to the system.
+        Connects to the orders database and writes new orders submitted through the public API.
+        """
+
+    metadata {
+        displayName = "Save Order Function"
+        annotations = {
+            "aws.lambda.function.populateEnvVars" = true,
+            "celerity.deployment.target" = variables.deploymentTarget
+        }
+    }
+
+    select by label {
+        service = "ordersApi"
+        exclude = [testOrdersTable]
+    }
+
+    spec {
+        functionName = "${values.namePrefix}-saveOrderFunction-v1"
+        codeUri = "./orders"
+        handler = "save_order.handler"
+        runtime = "python3.9"
+        tracing = "Active"
+        architectures = "arm64"
+        memorySize = if(values.isProd, 1024, 512)
+        timeout = 120
+        logRetentionDays = values.logRetentionDays
+        policy = values.lambdaExecutionPolicy
+        environment = {
+            variables = {
+                DATABASE_HOST = variables.databaseHost,
+                DATABASE_PORT = variables.databasePort,
+                DATABASE_USER = variables.databaseUser,
+                DATABASE_PASSWORD = variables.databasePassword,
+                DATABASE_NAME = variables.databaseName,
+                ALLOWED_ORIGINS = join(values.allowedOrigins, ","),
+                LOG_LEVEL = if(values.isProd, "INFO", "DEBUG")
+            }
+        }
+        vpcConfig = {
+            subnetIds = datasources.network.subnets,
+            securityGroupIds = datasources.network.securityGroups
+        }
+    }
+}
+
+resource batchProcessor: aws/ec2/instance {
+    description = "Background batch processor for order reconciliation."
+
+    metadata {
+        displayName = "Order Batch Processor"
+        labels = {
+            service = "ordersBatch",
+            tier = "background"
+        }
+    }
+
+    spec {
+        instanceType = variables.instanceSize
+        subnetId = datasources.network.subnets[0]
+        securityGroupIds = datasources.network.securityGroups
+        userData = base64encode(file("./scripts/batch-bootstrap.sh"))
+        tags = [
+            { Key = "environment", Value = variables.environment },
+            { Key = "Name", Value = "${values.namePrefix}-batchProcessor" }
+        ]
+    }
+}
+
+resource contentStoreBucket: aws/s3/bucket {
+    foreach values.bucketsToCreate
+
+    description = "Buckets that store content for the system."
+
+    metadata {
+        displayName = "Content Store ${elem.name}"
+    }
+
+    spec {
+        bucketName = "${values.namePrefix}-${elem.name}-${substr(sha256(values.namePrefix), 0, 7)}"
+        objectLockEnabled = elem.lockObjects
+        tags = [
+            { Key = "environment", Value = variables.environment },
+            { Key = "bucketNumber", Value = "bucket-${elem.number}" }
+        ]
+    }
+}
+
+include coreInfra "core-infra.yaml" {
+    description = "core infra (including database) for the Orders API"
+
+    variables {
+        databaseName = variables.databaseName
+    }
+
+    metadata {
+        sourceType = "aws/s3"
+        bucket = "order-system-blueprints"
+        region = "eu-west-1"
+    }
+}
+
+include ordersApi "api.yaml" {
+    description = "The stack for the Orders API"
+
+    variables {
+        databaseHost = variables.databaseHost
+        databasePort = variables.databasePort
+        databaseUser = variables.databaseUser
+        databasePassword = children.coreInfra.databasePassword
+        databaseName = variables.databaseName
+    }
+}
+
+metadata {
+    "function.builder" = "ESM",
+    "function.builder.minify" = false,
+    "deployment.region" = variables.region,
+    "deployment.target" = variables.deploymentTarget
+}
+
+export saveOrderFunctionArn: string {
+    description = "The ARN of the function used to save orders to the system"
+    field = resources.saveOrderFunction.spec.functionArn
+}
+
+export apiEndpoint: string {
+    description = "The public endpoint of the Orders API"
+    field = children.ordersApi.endpoint
+}
+```
+
+## File Format
+
+A blueprint file is a UTF-8 encoded text file with the extension `.blueprint` or `.bp`.
+
+Blueprints can be authored as a single file or split across multiple files in a directory, with includes used to stitch them together. See the [modular blueprints section](/docs/bluelink/blueprints/specification#modular-blueprints) of the specification for details.
+
+_Included blueprints are treated as child blueprints with their own deployment lifecycle, they are not merged into the parent blueprint._
+
+## Lexical Structure
+
+The lexical building blocks of the blueprint language that are used to build up the syntax of the language are described in this section.
+For the syntax of how these building blocks are combined to form valid blueprints, see the [syntax section](#syntax).
+
+### Comments
+
+The blueprint language uses `#` to introduce a comment, matching the comment style of the YAML format.
+A comment begins at the `#` and runs to the end of the line. There is no block (multi-line) comment form;
+a multi-line comment is written as consecutive single-line comments.
+
+A `#` that appears inside a string literal or a `${..}` substitution is treated as literal text and does
+not start a comment.
+
+```blueprintlang
+# A standalone comment on its own line.
+variable region: string {
+    default = "us-east-1" # An inline comment after a value.
+}
+```
+
+### Identifiers and Names
+
+Blueprint elements (variables, values, resources, data sources, includes, and exports) are declared with a name
+and later referred to from expressions. To keep the blueprint language, YAML, and JWCC formats interchangeable,
+a name uses exactly the same grammar as the [substitution language](/docs/bluelink/blueprints/specification#references--substitutions),
+so any name that can be declared can be referenced identically in every format.
+
+A name may be written in one of two forms:
+
+- **Bare**: starts with a letter or `_`, followed by any number of letters, digits, `_`, or `-`.
+- **Quoted**: a double-quoted string whose contents are letters, digits, `_`, `-`, or `.`. The blueprint language uses `"` as its only string delimiter; there is no single-quoted form.
+
+The quoted form exists only to allow the `.` character (otherwise reserved as the member accessor) and to use a
+name that would otherwise collide with a keyword. It does not widen the character set any further: the permitted
+characters are exactly those of the substitution language's `name` and `quoted name` productions (see the
+[variable reference grammar](/docs/bluelink/blueprints/specification#variable-references)). Hyphens are allowed
+unquoted because the language has no infix `-` operator to conflict with, the same reasoning that lets `/` appear
+unquoted in [element types](#element-types).
+
+A reference uses the matching accessor: `.name` for a bare name and `["name"]` for a quoted name.
+
+```blueprintlang
+variable region: string { ... }                # bare name, referenced as ${variables.region}
+variable "primary.region": string { ... }      # quoted name, referenced as ${variables["primary.region"]}
+```
+
+### Keywords
+
+The blueprint language reserves a small set of words that introduce or modify a syntactic construct. A reserved
+word cannot be used as a bare [element name](#identifiers-and-names); a name that would otherwise collide must
+be written in the quoted form.
+
+The reserved words, grouped by where they appear:
+
+- **Declaration headers** that start a top-level declaration: `variable`, `value`, `data`, `resource`, `include`,
+  `export` (see [Declarations](#declarations)).
+- **Level-1 sub-construct keywords** that introduce a block inside a declaration: `metadata`, `spec`, `select`,
+  `variables` (see [Whitespace and Layout](#whitespace-and-layout)). The `variables` keyword here is the
+  include's input-binding block; the same word names a top-level reference namespace, but that use is in bounded expressions
+  such as the right hand side of `=` or in a `${..}` substitution. There is no collision with the keyword form.
+- **Statement keywords** that introduce an inline statement inside a declaration body: `filter`
+  ([Filters](#filters)) and `foreach` ([Iteration](#iteration)).
+- **Inline modifiers**: `as` (renaming a [data source export](#data-source-exports)), and `by` and `label` (the
+  `select by label` link selector form).
+- **Directive keywords** that appear in the document preamble: `version` and `transform`.
+- **Filter operator keywords** that read as words and appear only in a `filter` statement: `in`, `not`, `has`,
+  `key`, `contains`, `starts`, `with`, `ends`. The multi-word forms `not in`, `has key`, `not has key`,
+  `not contains`, `starts with`, `not starts with`, `ends with`, and `not ends with` are sequences of these. The
+  full operator set is listed in the
+  [filter specification](/docs/bluelink/blueprints/specification#datasourcefilterdefinition).
+- **Literal keywords**, the named constants: `true`, `false`, `none`.
+- **Built-in type names**, reserved in the type position of a declaration: `string`, `integer`, `float`,
+  `boolean`, `array`, `object` (see [Scalar Types](#scalar-types) and [Element Types](#element-types)).
+
+`elem` and `i` are reserved as the iteration element and index references inside a resource that has a `foreach`
+statement, and have no meaning elsewhere (see [Iteration](#iteration)).
+
+### Whitespace and Layout
+
+Whitespace between tokens is generally not significant. The one structural rule is about `{ }`.
+
+Curly braces (`{ }`) represent a **block** when introduced by a declaration header (`variable`, `value`, `data`, `resource`,
+`include`, `export`) or by a level-1 sub-construct keyword. The level-1 sub-construct keywords are `metadata`
+(top-level, resource, data, and include), `spec` (resource), `select` (resource), and `variables` (include).
+Curly braces (`{ }`) represent an [object literal](#objects) when set as the value of a field assignment with `=`. Inside a block,
+every entry is itself a `field = value` assignment, and a field whose value is a map is an object literal, so
+`annotations`, `labels`, and `custom` inside `metadata`, and `environment` inside `spec`, are written with `=`.
+
+Entries in a block, and entries in an object literal, may be separated by either newlines or commas; the two
+are interchangeable. Newlines are conventional for one-per-line, fixed-schema content; commas read more
+compactly for free-form data. A trailing comma is permitted in both forms.
+
+## Types and Values
+
+The blueprint language has a small, fixed set of types: the four [scalar types](#scalar-types) (`string`,
+`integer`, `float`, `boolean`), the two composite types ([`array`](#arrays) and [`object`](#objects)), the
+[`none`](#the-none-value) value, and provider or transformer supplied [element types](#element-types) for typed declarations.
+The same set is used by the YAML and JWCC formats, mapped to the same core schema, so a literal in any
+form has the same canonical representation in the others.
+
+A type appears in two positions: as the **type annotation** on a declaration header (`variable region: string`,
+`data network: aws/vpc`, and so on), and as a **literal value** in field assignments, function arguments, and
+other expressions. The built-in type names are reserved in the type-annotation position (see
+[Keywords](#keywords)); plugin-supplied types follow the [element type](#element-types) grammar.
+
+Not every type is permitted in every declaration. Variables accept scalars and custom variable types only; values,
+exports, and most resource and data source fields additionally accept arrays and objects; data source exports are
+restricted to scalars and arrays of scalars. The [specification](/docs/bluelink/blueprints/specification) lists
+the allowed types for each declaration field.
+
+### Scalar Types
+
+The four scalar types are `string`, `integer`, `float`, and `boolean`. The same set is the universal primitive
+set across the blueprint language, YAML, and JWCC.
+
+- **`string`** is UTF-8 text. The literal forms are covered in [Strings and Interpolation](#strings-and-interpolation),
+  including triple-quoted multi-line strings and `${..}` interpolation.
+- **`integer`** is a whole number written as one or more digits with an optional leading `-`. There is no
+  thousands separator and no hexadecimal, octal, or scientific notation. Examples of valid values would be `0`, `120`, `-1`, `5432`.
+- **`float`** is a decimal number written as digits, a `.`, and more digits, with an optional leading `-`. Both
+  sides of the `.` are required, so `1.0` is a float but `1.` and `.5` are not. Examples of valid values would be:
+  `3.14`, `-0.5`.
+- **`boolean`** is `true` or `false`; the two literal keywords are the only allowed values.
+
+The grammar for `int literal` and `float literal` is given in the [lexical grammar](#lexical-grammar). Numeric
+literals are written without quotes; a quoted sequence of digits is a `string`, not a number. `integer` and
+`float` are distinct types: a literal `1` is an `integer` and a literal `1.0` is a `float`, and the two are not
+interchangeable for the purposes of type-checking, comparison, or equality.
+
+### Strings and Interpolation
+
+The blueprint language supports string literals with double quotes (`"`) and like with the embedded
+language in YAML and JWCC, `${..}` substitutions are used for interpolation.
+You can see more on how to reference blueprint elements in the [Expressions and References](#expressions-and-references) section.
+
+```blueprintlang
+description = "Connects to ${variables.databaseHost}"
+```
+
+#### Multi-line Strings
+
+A multi-line string is delimited by triple double-quotes (`"""`). It is the natural choice for long descriptions
+and supports `${..}` interpolation exactly like a single-line string. A `"` (or `""`) may appear inside without
+escaping; only `"""` closes the string.
+
+The opening `"""` must be followed by a line break, and the closing `"""` sits on its own line. The value is the
+text between them, with two adjustments:
+
+- The line break immediately after the opening `"""` and the line break immediately before the closing `"""` are
+  not part of the value.
+- The indentation of the closing `"""` is stripped from the start of every line, so block indentation in the
+  source stays out of the value. Each content line must be indented at least as far as the closing delimiter.
+
+```blueprintlang
+variable region: string {
+    description = """
+        The region to deploy resources in.
+        Must be a region where the service is available.
+        """
+}
+```
+
+The `description` above resolves to:
+
+```
+The region to deploy resources in.
+Must be a region where the service is available.
+```
+
+with no leading or trailing newline and no source indentation. This is the same canonical string a YAML block
+scalar or a JWCC `\n`-escaped string would produce, so the formats remain interchangeable.
+
+### Arrays
+
+An array literal is written with square brackets (`[` and `]`), with elements separated by commas. An element
+may be any expression, including a reference, a function call, or a nested array or object. A trailing comma
+after the final element is permitted.
+
+```blueprintlang
+value allowedOrigins: array {
+    value = [
+        "https://example.com",
+        "https://another-example.com",
+    ]
+}
+```
+
+### Objects
+
+An object literal is written with braces (`{` and `}`). Each entry is a key, an equals sign (`=`), and a value,
+with entries separated by commas. A value may be any expression, including a nested object or array. A trailing
+comma after the final entry is permitted.
+
+A key may be written as a bare identifier (a letter or `_` followed by letters, digits, `_`, or `-`) or as a
+quoted string. Unlike [element names](#identifiers-and-names), object keys are data rather than referenceable
+identifiers, so a quoted key may contain any character. This is needed to carry provider data whose keys fall
+outside the identifier grammar, such as IAM condition keys:
+
+```blueprintlang
+value bucketPolicy: object {
+    value = {
+        Effect = "Allow",
+        Condition = {
+            StringEquals = {
+                "aws:SourceArn" = "${variables.sourceArn}",
+            },
+        },
+    }
+}
+```
+
+A key that falls outside the substitution language's `quoted name` character set (letters, digits, `_`, `-`, and
+`.`) can be written but cannot be addressed individually from a `${..}` reference; reference an enclosing object
+instead. This limitation is identical in the YAML and JWCC formats, so the formats remain interchangeable.
+
+Object literals share the `{` and `}` delimiters with declaration blocks, but the two are distinguished by
+position and separator: an object literal appears where a value is expected and separates its entries with
+commas, whereas a declaration block follows a declaration header and separates its entries with newlines. See
+[Whitespace and Layout](#whitespace-and-layout).
+
+### Element Types
+
+Element types are the namespaced types served by providers and transformers: custom variable types such as `aws/ec2/instanceSize`,
+data source types such as `aws/vpc`, and resource types such as `aws/ec2/instance`. They appear in the type
+position of a declaration, after the `:` and before the block.
+
+An element type is a sequence of segments joined by `/`, with at least two segments (a provider or transformer and a type, with
+an optional service in between). Each segment is a lowerCamelCase identifier of letters and digits, starting with a
+letter. This is the same format the specification describes for
+[variable](/docs/bluelink/blueprints/specification#variabledefinition),
+[data source](/docs/bluelink/blueprints/specification#datasourcedefinition), and
+[resource](/docs/bluelink/blueprints/specification#resourcedefinition) types.
+
+```
+element type   =   type segment , "/" , type segment , { "/" , type segment } ;
+type segment    =   letter , { letter | digit } ;
+```
+
+```blueprintlang
+variable instanceSize: aws/ec2/instanceSize { ... }
+data network: aws/vpc { ... }
+```
+
+Because a provider type always contains at least one `/`, it is unambiguous from the single-word built-in types
+(`string`, `integer`, `float`, `boolean`, `array`, `object`) that can appear in the same position.
+
+Element types are written bare; there is no quoted form. A type is a resolvable coordinate into a provider's
+namespace, not free-form data, so it is deliberately constrained to the grammar above. The `/` separator and the
+identifier segments parse unquoted because the language has no infix `/` operator (the same reasoning that allows
+`-` in [names](#identifiers-and-names)), so every valid type is expressible without quoting. This differs from
+[object keys](#objects), which are data and accept any character when quoted, and from
+[element names](#identifiers-and-names), which offer a quoted form only to carry `.` or escape a keyword.
+
+The grammar above is enforced when parsing the blueprint language. In YAML and JWCC a type is an ordinary string
+to the native parser, and its conformance to this format is checked during the validation step against the
+canonical schema rather than during parsing. Both enforce the same format; only the stage differs. For this reason
+the type-name grammar lives here in the blueprint language, and the specification's prose description is left
+unchanged.
+
+### The none Value
+
+`none` is the blueprint language's explicit-absence value, written as the bare keyword `none` (see the
+`none literal` production in the [lexical grammar](#lexical-grammar)). It can appear wherever a value is
+expected: as a field value, an array element, an object value, a function argument, or the value of an
+[interpolation](#interpolation). It is the same `none` recognised by the substitution language across all three
+blueprint formats (see [Special Values](/docs/bluelink/blueprints/core-functions#special-values)).
+
+`none` is a distinct value, not a synonym for any empty form. It is not interchangeable with `""`, `0`, `false`,
+`[]`, or `{}`: those are present values whose content happens to be empty, whereas `none` represents the field
+having no value at all. The headline effect is that **a field whose value resolves to `none` is omitted from the
+materialised blueprint**, where the empty alternatives keep their key with an empty value.
+
+```blueprintlang
+spec {
+    monitoring = if(values.isProd, true, none)
+}
+```
+
+When `isProd` is `false`, the `monitoring` field is not present in the materialised resource spec at all, rather
+than being present and set to `false`. The same omission applies inside collections: a `none` element drops out
+of an array, and a `none` object value drops the key.
+
+For the expression-level behaviour, including how `none` propagates through function calls and is treated by
+string interpolation, see [none in Expressions](#none-in-expressions).
+
+## Document Structure
+
+A blueprint file is a single, flat sequence of two parts: a **preamble** that carries top-level directives, and
+a sequence of **declarations** that describe the blueprint elements. The preamble holds the
+[version directive](#version-directive), the optional [transform directive](#transform), and the optional
+top-level [metadata](#metadata) block; the declarations are [variables](#variables), [values](#values),
+[data sources](#data-sources), [resources](#resources), [includes](#includes), and [exports](#exports). Both
+parts map onto the top-level fields of the canonical schema (see the
+[specification](/docs/bluelink/blueprints/specification#spec)).
+
+Only the version directive is required. Cross-element references are resolved by name, so a declaration can
+appear before or after declarations it references. Conventional layout places the version directive first, groups
+declarations of the same kind together, and pushes top-level [metadata](#metadata) and
+[exports](#exports) towards the end, as in the [example](#example) at the top of this document.
+
+### Version Directive
+
+The version directive declares which version of the blueprint specification the file targets. It is required and
+written as the `version` keyword followed by a string literal naming the version:
+
+```blueprintlang
+version "2025-11-02"
+```
+
+The value is the same identifier the canonical schema uses for its `version` field, so a blueprint stays
+interchangeable across the three formats without any normalisation step. For the v2025-11-02 revision of the
+specification, the only accepted value is `"2025-11-02"` (see the
+[version specification](/docs/bluelink/blueprints/specification#version)). An implementation should reject a
+blueprint whose declared version is not one it supports.
+
+### Transform
+
+The transform directive applies one or more specialised transforms to the blueprint during preprocessing.
+Transforms typically introduce virtual resources that expand into a set of underlying resources, letting a
+blueprint be written at a higher level of abstraction. The directive is optional; when omitted, no transforms
+are applied.
+
+A single transform is written with the `transform` keyword followed by a string literal naming the transform:
+
+```blueprintlang
+transform "celerity-2027-02-01"
+```
+
+To apply more than one transform, write an array of strings; the transforms are applied in the order listed:
+
+```blueprintlang
+transform ["celerity-2027-02-01", "my-org/macros"]
+```
+
+The names are literals. References, function calls, and other expressions are not permitted in a transform
+position, matching the rule that
+[references cannot be used in a transform](/docs/bluelink/blueprints/specification#transform) in the canonical
+schema. The directive maps onto the `transform` field of the canonical schema, which accepts either a single
+string or an array of strings (see the
+[transform specification](/docs/bluelink/blueprints/specification#transform)).
+
+### Metadata
+
+Top-level metadata is a keyword-introduced block that holds a free-form key/value map. Implementations,
+transformers, and providers use it to carry context that spans multiple resources. The contents are
+unconstrained beyond the [metadata specification](/docs/bluelink/blueprints/specification#metadata): keys are
+strings, and values may be scalars, arrays, or nested objects.
+
+```blueprintlang
+metadata {
+    "function.builder" = "ESM",
+    "function.builder.minify" = false
+}
+```
+
+Each entry is a `field = value` assignment, the same shape as fields inside any other block (see
+[Whitespace and Layout](#whitespace-and-layout)). Keys may be bare identifiers or quoted names; the quoted form
+is required to carry the `.` character, which is the conventional namespacing separator for top-level metadata
+keys.
+
+Values are expressions: scalars, [array literals](#arrays), or [object literals](#objects). This is how nested
+data is expressed:
+
+```blueprintlang
+metadata {
+    "build.profile" = {
+        target = "es2020",
+        externals = ["aws-sdk"]
+    }
+}
+```
+
+Top-level metadata is distinct from the `metadata` sub-construct that appears inside a resource, data source,
+or include declaration. Those nested `metadata` blocks have their own field sets (`displayName`, `annotations`,
+`labels`, `custom` for resources; source-location fields for includes), defined by the specification for each
+declaration.
+
+## Declarations
+
+A declaration introduces a blueprint element. The six declaration kinds, one per blueprint element, share a
+common shape: a header naming the kind (`variable`, `value`, `data`, `resource`, `include`, `export`), a
+[name](#identifiers-and-names), a type annotation (an [element type](#element-types) for typed declarations, or
+a positional path for [includes](#includes)), and a `{ }` block of `field = value` assignments and, where the
+kind allows them, inline statements.
+
+```
+<kind> <name>: <type> {
+    field = value
+    ...
+}
+```
+
+Each declaration maps onto the corresponding blueprint element in the canonical schema. The sections that follow
+cover the blueprint-language surface for [variables](#variables), [values](#values),
+[data sources](#data-sources), [resources](#resources), [includes](#includes), and [exports](#exports).
+Field-level semantics that apply across all three formats live in the
+[specification](/docs/bluelink/blueprints/specification) rather than being repeated here; this document covers
+only the language-specific form.
+
+### Variables
+
+A variable declares a dynamic input to the blueprint. Its value is supplied at deployment time and can be
+referenced from any other element as `variables.<name>`. See the
+[variable specification](/docs/bluelink/blueprints/specification#variabledefinition) for the canonical field
+semantics.
+
+A variable is declared with the `variable` keyword, a name, and the variable type, followed by a block:
+
+```blueprintlang
+variable region: string {
+    default = "us-east-1"
+    description = "The region to deploy resources in"
+    allowedValues = ["us-east-1", "us-west-2", "eu-west-1"]
+}
+```
+
+The type on the header line is one of the four [scalar types](#scalar-types) (`string`, `integer`, `float`,
+`boolean`) or a provider-supplied custom variable type written as an [element type](#element-types), such as
+`aws/ec2/instanceSize`. Variables are restricted to scalar shapes; arrays and objects are not accepted. To pass
+in a complex structure, encode it as a JSON string and decode it in expressions with the `jsondecode` core
+function.
+
+The block holds:
+
+- `default` (optional): a fallback used when no value is supplied at deployment. The value's type must match the
+  variable's declared type. A variable with no `default` must be supplied at deployment.
+- `description` (optional): human-readable context for the variable.
+- `allowedValues` (optional): an array of permitted values, each matching the declared type. Boolean variables
+  do not accept `allowedValues`. For custom variable types, entries are the labels of the type's allowed options.
+- `secret` (optional, default `false`): when `true`, an implementation should mask the variable's value in logs
+  and other diagnostic output.
+
+```blueprintlang
+variable databasePassword: string {
+    description = "The database password the Orders API connects with"
+    secret = true
+}
+```
+
+### Values
+
+A value declares a static or computed value that can be reused across the blueprint. Unlike a variable, a value
+is not a deployment input: its content is fixed by the declaration itself, either as a literal or as an
+expression built from references and function calls. Values are referenced as `values.<name>`. See the
+[value specification](/docs/bluelink/blueprints/specification#valuedefinition) for the canonical field semantics.
+
+A value is declared with the `value` keyword, a name, and the value type, followed by a block:
+
+```blueprintlang
+value isProd: boolean {
+    value = variables.environment == "prod"
+}
+```
+
+The type on the header line is one of `string`, `integer`, `float`, `boolean`, `array`, or `object`. Values
+accept the two complex types as well as scalars, so unlike a variable a value can carry structured
+data.
+
+The block holds:
+
+- `value` (required): the expression that produces the value. It can be a literal, a
+  [reference](#references-and-accessors) to another blueprint element, a [function call](#function-calls), an
+  [operator expression](#operators), or any combination of these. The result must match the declared type.
+- `description` (optional): human-readable context.
+- `secret` (optional, default `false`): when `true`, an implementation should mask the value in logs and other
+  diagnostic output.
+
+A value with an `array` or `object` type uses the corresponding literal form for its `value` field:
+
+```blueprintlang
+value bucketsToCreate: array {
+    value = [
+        { name = "primary",   lockObjects = true,  number = 1 },
+        { name = "secondary", lockObjects = false, number = 2 }
+    ]
+}
+```
+
+There is no `default` field on a value: the `value` field is required and always carries the result, so a value
+is fully defined by its declaration.
+
+### Data Sources
+
+A data source reads values from a resource that exists outside the blueprint and exposes selected fields to the
+rest of the blueprint. It is declared with the `data` keyword, a name, and the data source type, followed by a
+block. See the [data sources specification](/docs/bluelink/blueprints/specification#datasources) for the full
+field semantics.
+
+```blueprintlang
+data network: aws/vpc {
+    metadata {
+        displayName = "Network source"
+    }
+
+    filter "tags" has key variables.environment
+
+    export subnets: array
+    export securityGroups: array {
+        description = "The security groups to associate with the service"
+    }
+    export vpcId as vpc: string
+}
+```
+
+The type (`aws/vpc` above) must be a data source type served by one of the configured providers, namespaced the
+same way as [element types](#element-types). A data source always resolves to a single external resource; if a
+filter matches more than one, the first is used.
+
+The block contains an optional `description` field giving human-readable context for the data source, an optional
+`metadata` block (`displayName`, `annotations`, and `custom`, all optional, see the
+[data source metadata specification](/docs/bluelink/blueprints/specification#datasourcemetadatadefinition)), one
+or more [filters](#filters), and one or more [exports](#data-source-exports). Field values such as the filter `search` above
+are written as bare expressions (`variables.environment`); `${..}` is only needed for interpolation inside a
+string.
+
+#### Filters
+
+A filter selects the external resource to read. It is written as a single statement of the form
+`filter <field> <operator> <search>`, read left to right (see the
+[filter specification](/docs/bluelink/blueprints/specification#datasourcefilterdefinition)):
+
+```blueprintlang
+filter "tags" has key variables.environment
+```
+
+- `<field>`: a string naming the field on the external resource to compare. Nested fields use dot notation, for
+  example `"metadata.name"`. This is a field of the external resource, not one of the data source's exported
+  fields.
+- `<operator>`: how to compare, with the field on the left and the search value on the right. One of `==`, `!=`,
+  `in`, `not in`, `has key`, `not has key`, `contains`, `not contains`, `starts with`, `not starts with`,
+  `ends with`, `not ends with`, `>`, `<`, `>=`, `<=` (see [Operator Behaviours](/docs/bluelink/blueprints/specification#operator-behaviours)).
+  Equality is `==`, matching the [expression operators](#operators); it maps to the operator name `=` in the
+  canonical YAML and JWCC schema. Because the operator comes from this fixed set, the boundary between a multi-word
+  operator such as `has key` and the search value is unambiguous.
+- `<search>`: the value to compare against, written as a bare expression: a scalar, an array of scalars, or a
+  reference such as `variables.environment`. An array `search` is only meaningful for `in` and `not in`, where the
+  field must match one of the values, and for array-to-array `==` and `!=`, which is a positional, element-wise
+  match. For every other operator the search value is a scalar.
+
+A data source may have more than one filter. Write each on its own line; the filters are combined with a logical
+`and`, so the data source matches only when every filter matches.
+
+```blueprintlang
+filter "tags" has key variables.environment
+filter "state" == "available"
+```
+
+The `in` and `not in` operators take an array `search`, matching the field against any value in the set:
+
+```blueprintlang
+filter "state" in ["available", "pending"]
+filter "instanceType" not in ["t2.nano", "t2.micro"]
+```
+
+#### Data Source Exports
+
+An export declares a field to expose from the data source, together with its type. The type is required: a data
+source's fields are author-chosen projections of external data that the engine has no schema for, so it cannot be
+inferred (see the [export specification](/docs/bluelink/blueprints/specification#datasourceexportdefinition)). An
+exported field's type must be one of `string`, `integer`, `float`, `boolean`, or `array`, where arrays may only
+hold primitives.
+
+Each export is a statement of the form `export <field>: <type>`:
+
+```blueprintlang
+export subnets: array
+```
+
+To expose a field under a different name, use `as`. The source field comes first and the exported name second, so
+`export vpcId as vpc: string` exposes the external `vpcId` field under the name `vpc`, referenced as
+`${datasources.network.vpc}`:
+
+```blueprintlang
+export vpcId as vpc: string
+```
+
+When an export needs more than a type, such as a `description`, follow the type with a block, the same shape as a
+variable or value declaration:
+
+```blueprintlang
+export securityGroups: array {
+    description = "The security groups to associate with the service"
+}
+```
+
+To export every field from the data source, use the `*` wildcard in place of the individual export statements. The
+wildcard takes the fields and their types as the provider defines them, so no type is given. It cannot be combined
+with named exports.
+
+```blueprintlang
+export *
+```
+
+### Resources
+
+A resource declares a resource provisioned by one of the configured providers, such as an AWS Lambda function,
+an S3 bucket, or a Kubernetes pod. It is the central declaration of a blueprint: data sources, values, includes,
+and exports exist primarily to feed and expose data through resources. See the
+[resource specification](/docs/bluelink/blueprints/specification#resourcedefinition) for the canonical field
+semantics.
+
+A resource is declared with the `resource` keyword, a name, and the resource type, followed by a block:
+
+```blueprintlang
+resource saveOrderFunction: aws/lambda/function {
+    description = "The function responsible for saving a new order to the system."
+
+    metadata {
+        displayName = "Save Order Function"
+        annotations = {
+            "aws.lambda.function.populateEnvVars" = true
+        }
+    }
+
+    select by label {
+        service = "ordersApi"
+    }
+
+    spec {
+        functionName = "saveOrderFunction"
+        codeUri = "./orders"
+        handler = "save_order.handler"
+        runtime = "python3.12"
+        timeout = 120
+    }
+}
+```
+
+The type (`aws/lambda/function` above) must be a resource type served by one of the configured providers,
+namespaced the same way as [element types](#element-types). Resource names are referenced elsewhere as
+`resources.<name>` (or, in many positions, the bare name `<name>`).
+
+A resource body contains, in any order:
+
+- `description` (optional): a top-level field giving human-readable context for the resource.
+- `metadata { ... }` (optional sub-construct): display name, labels, annotations, and custom metadata. See
+  [Metadata, Labels and Annotations](#metadata-labels-and-annotations).
+- `select by label { ... }` (optional sub-construct): the implicit link selector for the resource. See
+  [Link Selectors](#link-selectors).
+- `condition` (optional): a top-level field that controls whether the resource is created. See
+  [Conditions](#conditions).
+- `foreach` (optional inline statement): templates the resource over the elements of an array. See
+  [Iteration](#iteration).
+- `dependsOn` (optional): explicit ordering dependencies. See [Dependencies](#dependencies).
+- `removalPolicy` (optional): controls the underlying resource's fate on removal. See
+  [Removal Behaviour](#removal-behaviour).
+- `spec { ... }` (required sub-construct): the provider-defined resource specification. See [Spec](#spec).
+
+Each of these is documented in turn below.
+
+#### Metadata, Labels and Annotations
+
+The resource `metadata { ... }` sub-construct carries identification and linkage information for the resource. It
+is optional and holds the four fields defined by the
+[resource metadata specification](/docs/bluelink/blueprints/specification#resourcemetadatadefinition):
+
+```blueprintlang
+metadata {
+    displayName = "Save Order Function"
+
+    labels = {
+        service = "ordersApi"
+    }
+
+    annotations = {
+        "aws.lambda.function.populateEnvVars" = true,
+        "celerity.deployment.target" = variables.deploymentTarget
+    }
+
+    custom = {
+        ui = {
+            position = { x = 120, y = 200 }
+        }
+    }
+}
+```
+
+- `displayName` (optional, string): a name suitable for display in UI and CLI tools.
+- `labels` (optional, string-to-string map): the labels by which other resources can implicitly link to this one.
+  Each key and value is a string. Labels are the matching ground for [link selectors](#link-selectors).
+- `annotations` (optional, string-to-scalar map): provider and link-specific context. Annotation values must be
+  scalars (`string`, `integer`, `float`, or `boolean`); composite values are not accepted. Keys are conventionally
+  namespaced with dot notation (`aws.lambda.function.populateEnvVars`), which requires the quoted-key form (see
+  [Objects](#objects)).
+- `custom` (optional, object): an open mapping for context outside the spec's scope, such as visual hints for a
+  diagramming tool. Unlike `annotations`, `custom` values can be nested objects, arrays, or scalars.
+
+The `metadata` sub-construct here is distinct from the top-level [metadata](#metadata) block: top-level metadata
+carries blueprint-wide context, whereas resource metadata is scoped to the single resource.
+
+#### Link Selectors
+
+A link selector picks the resources this resource should implicitly link to, based on labels declared in each
+candidate's [metadata](#metadata-labels-and-annotations). The blueprint language exposes this as the
+`select by label { ... }` sub-construct, which is the language form of the
+[`linkSelector.byLabel` field](/docs/bluelink/blueprints/specification#linkselectordefinitions) in the canonical
+schema. See [links](/docs/bluelink/blueprints/links) for how the link is then materialised by the provider.
+
+```blueprintlang
+select by label {
+    service = "ordersApi"
+}
+```
+
+Each entry inside the block is a `<labelKey> = <labelValue>` assignment. Both the key and the value are strings:
+bare identifiers on the left are read as string keys, matching the object-literal rules in
+[Objects](#objects). A candidate resource is selected when **every** label in the block matches a label of the
+same key on the candidate.
+
+To exclude specific resources that would otherwise match, add an `exclude` list of resource names:
+
+```blueprintlang
+select by label {
+    service = "ordersApi"
+    exclude = [testOrdersTable]
+}
+```
+
+`exclude` entries are bare references to resource names declared in the same blueprint. Expressions and
+`${..}` substitutions are not permitted; the values must be literal resource names.
+
+Link selectors only match resources in the same blueprint; resources in a parent or child blueprint cannot be
+selected (see the [linkSelector specification](/docs/bluelink/blueprints/specification#linkselector)).
+
+#### Conditions
+
+A `condition` controls whether the resource is created. It is an optional top-level field whose value is a
+boolean expression: when the expression evaluates to `true`, the resource is created; when it evaluates to
+`false`, the resource is omitted. The condition is evaluated after variables and values are resolved, so it can
+branch on any blueprint input. See the
+[condition specification](/docs/bluelink/blueprints/specification#condition) for the canonical field semantics.
+
+In the blueprint language, the natural form is a bare boolean expression using the language's
+[operators](#operators) and functions:
+
+```blueprintlang
+resource saveOrderFunction: aws/lambda/function {
+    condition = variables.deploymentTarget == "serverless"
+        && variables.environment == "production"
+        && values.featureFlags.saveOrderEnabled
+
+    spec { ... }
+}
+```
+
+Conditions tend to grow long enough that a single line becomes hard to read, so the expression above is broken
+across multiple lines at the `&&` operator. The break can sit either before or after the operator, and the same
+expression on a single line stays equivalent. See [Multi-line Expressions](#multi-line-expressions) for the
+general rule.
+
+This maps directly to a `${..}`-wrapped boolean expression in the canonical schema. The
+[`conditionDefinition`](/docs/bluelink/blueprints/specification#conditiondefinition) object form is also
+accepted, written as an object literal whose only field is one of `and`, `or`, or `not`:
+
+```blueprintlang
+condition = {
+    and = [
+        variables.deploymentTarget == "serverless",
+        variables.environment == "production"
+    ]
+}
+```
+
+A condition object **must** have exactly one of `and`, `or`, or `not` set. Entries inside `and` and `or` are
+themselves boolean expressions or further condition objects; the entry under `not` is a single such expression
+or object.
+
+When a resource is omitted by its `condition`, the engine treats it as if the resource had been removed from
+the blueprint, subject to the [removal behaviour](#removal-behaviour). Any references that would have pointed at
+the omitted resource must be resolved against the resource being absent (typically by branching on the same
+condition or by using `none`).
+
+#### Iteration
+
+A resource can be templated to produce many instances by adding a `foreach` statement to its body. The statement
+takes an expression that resolves to an array; one instance of the resource is produced per element. `foreach` is
+the blueprint language form of the `each` field on a resource (see the
+[resource specification](/docs/bluelink/blueprints/specification#resourcedefinition)).
+
+```blueprintlang
+resource contentStoreBucket: aws/s3/bucket {
+    foreach values.bucketsToCreate
+
+    spec {
+        bucketName = elem.name
+    }
+}
+```
+
+Inside the body, two reserved references are available:
+
+- `elem`: the current element. It can be a scalar or an object; use the standard `.name` and `[..]` accessors to
+  read its fields (`elem.name`, `elem.tags[0]`).
+- `i`: the 0-based index of the current element. It is an integer.
+
+Both are usable only within a resource whose body contains a `foreach`; using them anywhere else is an error.
+
+The expression after `foreach` must resolve to an **array**. Objects nested inside the array are fine, but if
+your data is a mapping or object you need to unwrap it first with the `vals(..)` core function. **Nested
+iteration is not permitted**: the `foreach` expression cannot reference, directly or transitively, another
+iterating resource or an included child blueprint.
+
+There is **no arithmetic on `i`**, because the canonical substitution language has no arithmetic operators or
+functions (see [Operators](#operators) for the rationale). For human-friendly numbering, carry the number in the
+iterated data:
+
+```blueprintlang
+value bucketsToCreate: array {
+    value = [
+        { name = "primary",   lockObjects = true,  number = 1 },
+        { name = "secondary", lockObjects = false, number = 2 },
+    ]
+}
+
+resource contentStoreBucket: aws/s3/bucket {
+    foreach values.bucketsToCreate
+
+    spec {
+        bucketName = elem.name
+        tags = [
+            { Key = "bucketNumber", Value = "bucket-${elem.number}" }
+        ]
+    }
+}
+```
+
+#### Dependencies
+
+Most ordering between resources is inferred from references and links: a resource that reads
+`resources.<other>.spec.<field>` depends on `<other>`, and a [link selector](#link-selectors) implies a
+dependency on every selected resource. The `dependsOn` field exists for the remaining cases where ordering must
+be declared explicitly because the engine cannot infer it.
+
+`dependsOn` takes either a single resource name or an array of resource names:
+
+```blueprintlang
+resource webhookHandler: aws/lambda/function {
+    dependsOn = "auditLogStream"
+    spec { ... }
+}
+
+resource consumer: aws/lambda/function {
+    dependsOn = ["queueDrainer", "schemaInitialiser"]
+    spec { ... }
+}
+```
+
+Entries are bare references to resource names declared in the same blueprint. As the
+[`dependsOn` specification](/docs/bluelink/blueprints/specification#dependson) notes, this field should only be
+used when references and links cannot express the relationship; it is not the preferred way to model resource
+relationships.
+
+#### Removal Behaviour
+
+The `removalPolicy` field controls what happens to the underlying resource in the provider when the resource is
+removed from the blueprint (either by being deleted from the source or by a `condition` that becomes `false` on
+a later deployment). It takes one of two literal string values:
+
+- `"delete"` (default): the underlying resource is destroyed in the provider when the resource is removed.
+- `"retain"`: the underlying resource is left in place in the provider and only detached from the blueprint's
+  managed state. Use this for stateful resources (databases, object stores with data) that should survive a
+  blueprint removal.
+
+```blueprintlang
+resource ordersTable: aws/dynamodb/table {
+    removalPolicy = "retain"
+    spec { ... }
+}
+```
+
+The value must be a literal string. References, function calls, and `${..}` substitutions are not accepted in
+this position; the lifecycle decision is fixed at authoring time rather than depending on runtime state (see the
+[removalPolicy specification](/docs/bluelink/blueprints/specification#removalpolicy)).
+
+#### Spec
+
+The `spec { ... }` sub-construct holds the provider-defined specification for the resource: the fields that
+describe what the resource should look like once deployed, such as a Lambda function's `handler` and `runtime` or
+an S3 bucket's `bucketName` and `objectLockEnabled`. The `spec` block is required on every resource.
+
+```blueprintlang
+resource saveOrderFunction: aws/lambda/function {
+    spec {
+        functionName = "saveOrderFunction"
+        codeUri = "./orders"
+        handler = "save_order.handler"
+        runtime = "python3.12"
+        timeout = 120
+        environment = {
+            variables = {
+                DATABASE_HOST = variables.databaseHost,
+                DATABASE_PORT = variables.databasePort
+            }
+        }
+    }
+}
+```
+
+The field set inside `spec` is defined by the resource type's provider rather than by the blueprint
+specification, so the exact keys vary per type. Each entry is a `field = value` assignment, and the value can be
+any expression the language supports: scalar literals, [array literals](#arrays), [object literals](#objects),
+references such as `variables.databaseHost`, function calls, or
+[string interpolation](#strings-and-interpolation).
+
+Spec field values can resolve to any of `string`, `integer`, `float`, `boolean`, `array`, or `object` (see the
+[spec specification](/docs/bluelink/blueprints/specification#spec-required)). Providers should publish a schema
+for their resource type; an implementation should reject a blueprint whose spec does not match.
+
+### Includes
+
+An include pulls in another blueprint as a child so that its outputs can be referenced from the parent. It is
+declared with the `include` keyword, a name, the path to the child blueprint, and a block. See
+[Modular Blueprints](/docs/bluelink/blueprints/specification#modular-blueprints) and the
+[include specification](/docs/bluelink/blueprints/specification#includedefinition) for the full semantics.
+
+```blueprintlang
+include coreInfra "core-infra.yaml" {
+    description = "core infra (including database) for the Orders API"
+
+    variables {
+        databaseName = variables.databaseName
+    }
+
+    metadata {
+        sourceType = "aws/s3"
+        bucket = "order-system-blueprints"
+        region = "eu-west-1"
+    }
+}
+```
+
+The path follows the name as a positional string. It may be a path relative to the parent blueprint, a
+working-directory path built with `${cwd()}`, or the key of a blueprint in a remote store. The block holds:
+
+- `description`: optional context for the child blueprint.
+- `variables`: a block binding the child's input variables. Each entry binds a variable name defined in the
+  child blueprint to an expression in the parent (a parent variable, a literal, or another child's output) that
+  resolves to a scalar.
+- `metadata`: a block of implementation-defined context for sourcing the child, such as the `sourceType`,
+  `bucket`, and `region` for a remote blueprint.
+
+Children are deployed in an order inferred from the references between them. Because `ordersApi` reads
+`children.coreInfra.databasePassword`, `coreInfra` is resolved before `ordersApi`:
+
+```blueprintlang
+include ordersApi "api.yaml" {
+    description = "The stack for the Orders API"
+
+    variables {
+        databaseHost = variables.databaseHost
+        databasePort = variables.databasePort
+        databaseUser = variables.databaseUser
+        databasePassword = children.coreInfra.databasePassword
+        databaseName = variables.databaseName
+    }
+}
+```
+
+A child blueprint's outputs are referenced with the `children.<name>.<output>` accessor, the same form used in
+the [substitution language](/docs/bluelink/blueprints/specification#references--substitutions).
+
+### Exports
+
+An export exposes a value from this blueprint as a publicly accessible attribute, so it can be referenced from
+other blueprints as a child output or from external systems that interface with an implementation of the
+specification. This is the blueprint-level `exports` mapping; the `export` statements that appear inside a
+[data source](#data-sources) body are a separate construct, sharing the same keyword, that defines a data
+source's exposed fields.
+
+An export is declared with the `export` keyword, a name, the type, and a block. See the
+[export specification](/docs/bluelink/blueprints/specification#exportdefinition) for the canonical schema.
+
+```blueprintlang
+export saveOrderFunctionArn: string {
+    description = "The ARN of the function used to save orders to the system."
+    field = resources.saveOrderFunction.spec.functionArn
+}
+```
+
+The type on the header line is one of `string`, `integer`, `float`, `boolean`, `array`, or `object`.
+Implementations should fail with an informative error when the declared type does not match the type of the
+referenced value.
+
+The block holds:
+
+- `field` (required): a reference to the value to expose. The reference must be a pure path; it cannot be a
+  function call, a `${..}` substitution, or any computed expression. The canonical schema treats `field` as a
+  plain string for this reason (see the [export specification](/docs/bluelink/blueprints/specification#exportdefinition)).
+  Two equivalent forms are accepted:
+
+  - A **bare reference** (preferred): `field = resources.saveOrderFunction.spec.functionArn`. Reads natively in
+    the blueprint language and matches the bare-expression rule used for every other field value.
+  - A **string literal** containing the path: `field = "resources.saveOrderFunction.spec.functionArn"`. Mirrors
+    the YAML and JWCC form, where `field` is a plain string.
+
+  Both forms produce the same canonical string; the blueprint library normalises a bare reference into the same
+  internal structure that a string-parsed `field` produces in the other formats.
+
+  The path may target any addressable value: `resources.<name>.spec.<field>` or
+  `resources.<name>.metadata.<field>`, `variables.<name>`, `values.<name>`, `children.<name>.<output>`, or
+  `datasources.<name>.<field>`.
+
+- `description` (optional): context for the exported value.
+
+## Expressions and References
+
+An expression is any value that is not a written literal: a reference to another element, a function call, an
+operator combination, or a conditional. The same expression language is shared with YAML and JWCC, where it is
+wrapped in `${..}` substitutions inside strings. In the blueprint language, expressions are written directly as
+field values; `${..}` is reserved for [interpolating](#interpolation) an expression into a larger string.
+
+```blueprintlang
+value isProd: boolean {
+    value = variables.environment == "prod"
+}
+
+resource saveOrderFunction: aws/lambda/function {
+    spec {
+        memorySize = if(values.isProd, 1024, 512)
+        timeout = max(variables.minTimeout, 120)
+    }
+}
+```
+
+An expression is built from four kinds of primary form, each covered in its own subsection below:
+
+- [References](#references-and-accessors) read values from other elements of the blueprint.
+- [Function calls](#function-calls) apply a function to a list of arguments. The function can be one of the
+  [core functions](/docs/bluelink/blueprints/core-functions) or a function contributed by a configured provider.
+- [Operators](#operators) combine sub-expressions with infix and unary operators that desugar to function calls.
+- Literals (scalar literals, [arrays](#arrays), [objects](#objects), and [`none`](#the-none-value)) are also
+  expressions and appear wherever a more complex expression would.
+
+The expression grammar matches the one used by the embedded substitution language (see
+[References & Substitutions](/docs/bluelink/blueprints/specification#references--substitutions)). Whether the
+expression appears bare in the blueprint language or inside a `${..}` substitution in YAML or JWCC, the
+resulting canonical schema is the same blueprint.
+
+### Interpolation
+
+`${..}` interpolates an expression into the middle of a [string literal](#strings-and-interpolation). The
+expression inside is evaluated, converted to a string, and spliced into the surrounding text. Both single-line
+and [multi-line strings](#multi-line-strings) support the form, and the expression inside follows the same
+grammar as a bare expression elsewhere.
+
+```blueprintlang
+description = "Connects to ${variables.databaseHost}:${variables.databasePort}"
+bucketName = "${values.namePrefix}-${elem.name}-${substr(sha256(values.namePrefix), 0, 7)}"
+```
+
+Outside of a string, expressions are bare. A field whose entire value is an expression should be written
+without quotes or `${..}`:
+
+```blueprintlang
+# Idiomatic.
+memorySize = if(values.isProd, 1024, 512)
+
+# Works, but the wrapping adds nothing.
+memorySize = "${if(values.isProd, 1024, 512)}"
+```
+
+The two forms produce the same final value, so the choice is stylistic; the bare form reads more naturally
+in the blueprint language and matches the rest of the doc's examples. When `${..}` evaluates to
+[`none`](#none-in-expressions), it is replaced with the empty string in the surrounding text (see
+[none in Expressions](#none-in-expressions) for the full propagation rules).
+
+### References and Accessors
+
+A reference reads a value from another element in the blueprint, or, for loop helpers, from the current
+iteration context. The substitution language defines six reference forms, and the blueprint language uses each
+of them unchanged, parsed bare in expression positions and inside `${..}` when interpolated into a string.
+
+| reference | reads | example |
+|---|---|---|
+| `variables.<name>` | the value of a [variable](#variables) | `variables.databaseHost` |
+| `values.<name>` | a static or computed [value](#values) | `values.namePrefix` |
+| `resources.<name>` (or bare `<name>`) | fields on a [resource](#resources) via `.spec` or `.metadata` | `resources.saveOrderFunction.spec.functionArn` |
+| `datasources.<name>.<field>` | the [exported fields](#data-source-exports) of a data source | `datasources.network.subnets` |
+| `children.<name>.<output>` | the outputs of an [included child blueprint](#includes) | `children.coreInfra.databasePassword` |
+| `elem` and `i` | the current element and index inside a [foreach](#iteration) | `elem.name`, `i` |
+
+Each reference is followed by zero or more **accessors** that drill into nested structure. The two accessor
+forms are:
+
+- **Dot accessor** `.<name>`: reads the named field. Used for object fields and named exports
+  (`values.bucketConfig.primary.name`, `datasources.network.vpc`).
+- **Bracket accessor** `[<index>]` or `["<name>"]`: reads an array element by non-negative integer index
+  (`datasources.network.subnets[0]`), or an object field whose key contains characters outside the bare-name
+  set, most often the `.` (`metadata.annotations["aws.lambda.function.populateEnvVars"]`). A bare non-negative
+  integer in the brackets is an array index; a quoted string is a field name.
+
+The shorthand `[]` is equivalent to `[0]` and reads the **first** element of an array. It is convenient for a
+data source whose exported array carries a single value:
+
+```blueprintlang
+subnetId = datasources.network.subnets[]
+```
+
+A reference's permitted shape varies by element kind:
+
+- A `variables.<name>` reference resolves to a scalar; further accessors are not permitted, since variables
+  are scalar by construction (see [Variables](#variables)). To pull a field out of a JSON-encoded string
+  variable, decode it first with the `jsondecode` core function.
+- A `datasources.<name>.<field>` reference must include the exported-field name; bare `datasources.<name>` is
+  not a valid reference.
+- A `children.<name>.<output>` reference must include the output name; bare `children.<name>` is not valid.
+- A `resources.<name>` reference may drill into `.spec.*` or `.metadata.*` when substituting into a
+  value, where `.metadata.*` can be `.labels.*`, `.annotations.*`, `.custom.*`, or `.displayName`. A
+  bare reference with no drill-in path (e.g. `resources.foo` or `foo`) auto-resolves to a
+  provider-defined id field of the resource in value contexts; in dependency-only positions such as
+  `dependsOn`, the bare reference names the resource itself rather than its id. For a resource
+  declared with `each`, an optional integer index in brackets between the resource name and the
+  drill-in selects a specific templated instance, e.g. `resources.<name>[0].spec.<field>` or
+  `<name>[0].spec.<field>`; an empty `[]` is shorthand for the first instance.
+
+A resource can be referenced by its bare name in addition to the `resources.` prefix, so
+`saveOrderFunction.spec.functionArn` and `resources.saveOrderFunction.spec.functionArn` are equivalent. The
+prefix is required only when the bare name would collide with a [keyword](#keywords) or with another name
+visible at the same position.
+
+The full grammar for each reference form, including the precise productions for `name accessor` and
+`index accessor`, lives in the
+[References & Substitutions](/docs/bluelink/blueprints/specification#references--substitutions) section of the
+specification.
+
+### Operators
+
+The blueprint language provides infix and unary operators as sugar over the sub-language's
+[operator functions](/docs/bluelink/blueprints/core-functions). Each operator desugars to the corresponding
+function call in the canonical schema, so `a == b && c > d` in the blueprint language is the same blueprint as
+`${and(eq(a, b), gt(c, d))}` in YAML or JWCC. The function forms remain available everywhere the operators are.
+
+| operator | arity | maps to | meaning |
+|---|---|---|---|
+| `==` | binary | `eq` | equal |
+| `!=` | binary | `not(eq(..))` | not equal |
+| `<` | binary | `lt` | less than |
+| `<=` | binary | `le` | less than or equal |
+| `>` | binary | `gt` | greater than |
+| `>=` | binary | `ge` | greater than or equal |
+| `&&` | binary | `and` | logical and |
+| `\|\|` | binary | `or` | logical or |
+| `!` | unary (prefix) | `not` | logical not |
+
+Equality is `==` rather than `=` because `=` is the assignment token used in declaration blocks and object
+literals. Data source [filters](#filters) use `==` for equality as well, for consistency; in the canonical YAML
+and JWCC schema this maps to the operator name `=`.
+
+There are no arithmetic operators. Numeric work is done with the `min`, `max`, and `abs` functions. This is
+deliberate: keeping `-` and `/` out of the operator set is what lets `-` appear in
+[names](#identifiers-and-names) and `/` in [element types](#element-types) without ambiguity. If arithmetic
+operators were ever added, those two rules would have to be revisited. Conditional selection uses the `if`
+function rather than a ternary operator.
+
+#### Precedence and Associativity
+
+Operators are listed below from highest precedence (binds tightest) to lowest. All binary operators are
+left-associative; the unary `!` is right-associative. Parentheses `( .. )` group expressions and override
+precedence.
+
+| precedence | operators |
+|---|---|
+| highest | function calls, `.` and `[..]` accessors, `( .. )` grouping |
+| | `!` (unary) |
+| | `<`  `<=`  `>`  `>=` |
+| | `==`  `!=` |
+| | `&&` |
+| lowest | `\|\|` |
+
+#### Multi-line Expressions
+
+A long expression can be broken across multiple lines at a binary operator boundary. Place the break either
+**before** the operator (operator on the continuation line) or **after** it (operator at the end of the previous
+line); the parser treats the newline as whitespace in either case. The same expression written as a one-liner
+remains valid; the break is stylistic.
+
+The leading-operator form is preferred for chains of `&&` and `||`, because it lines up the operators down the
+left margin and keeps the boolean structure scannable:
+
+```blueprintlang
+condition = variables.deploymentTarget == "serverless"
+    && variables.environment == "production"
+    && values.featureFlags.saveOrderEnabled
+```
+
+The trailing-operator form is equally accepted:
+
+```blueprintlang
+condition = variables.deploymentTarget == "serverless" &&
+    variables.environment == "production" &&
+    values.featureFlags.saveOrderEnabled
+```
+
+Newlines are also insignificant inside any grouping construct (`( .. )`, `[ .. ]`, `{ .. }`), so long function
+calls, array literals, and object literals naturally span multiple lines without needing an operator on the
+continuation line:
+
+```blueprintlang
+value = max(
+    variables.minMemorySize,
+    values.recommendedMemorySize
+)
+```
+
+A newline that does not sit at an operator boundary and is not inside a grouping construct ends the expression
+and acts as the entry separator described in [Whitespace and Layout](#whitespace-and-layout).
+
+### Function Calls
+
+A function call applies a function to a list of arguments and produces a value. The form is the function name
+followed by parentheses enclosing a comma-separated list of arguments:
+
+```blueprintlang
+value namePrefix: string {
+    value = join(["ordersApi", variables.environment], "-")
+}
+
+memorySize = if(values.isProd, 1024, 512)
+```
+
+The function can be one of the [core functions](/docs/bluelink/blueprints/core-functions) or a function
+contributed by a configured provider; the call syntax is identical for both. The core set is the same across
+the blueprint language, YAML, and JWCC.
+
+#### Arguments
+
+An argument is any expression: a literal, a [reference](#references-and-accessors), an
+[operator expression](#operators), another function call, or a nested [array](#arrays) or
+[object](#objects) literal. Arguments are positional by default and matched to the function's parameters by
+position:
+
+```blueprintlang
+suffix = substr(sha256(values.namePrefix), 0, 7)
+```
+
+The `<name> = <expression>` form is also syntactically valid for an argument and is parsed as a
+`named function arg` (see the [substitution grammar](/docs/bluelink/blueprints/specification#substitution-grammar)).
+This form is **only meaningful for the [`object`](/docs/bluelink/blueprints/core-functions) core function**,
+which constructs an object whose fields are the named arguments. In any other function the parser accepts the
+form, but the names are ignored and the values are treated as positional arguments.
+
+#### Chaining Accessors
+
+A function call can return any type, including arrays and objects. The result can be followed by the same
+[accessors](#references-and-accessors) used on a reference, so `.field` and `[..]` chains work directly on a
+call's return value:
+
+```blueprintlang
+value firstHost: string {
+    value = map(values.cacheClusterConfig.hosts, trimprefix_g("http://"))[0]
+}
+
+value endpointHost: string {
+    value = object(host = "api.example.com", port = 8080).host
+}
+```
+
+Nesting function calls is the standard way to build pipelines: the innermost call evaluates first, with each
+outer call consuming the inner's result. For calls that take another function as an argument, see
+[Higher-Order Functions](#higher-order-functions).
+
+### Higher-Order Functions
+
+A higher-order function is a function that takes another function as an argument, or returns one. The blueprint
+language and the canonical substitution language both express higher-order function use through ordinary
+function-call syntax; there is no dedicated operator form for piping or composition, and the same code reads the
+same in YAML, JWCC, and the blueprint language.
+
+Two function-composition higher-order functions are available in the [core set](/docs/bluelink/blueprints/core-functions):
+
+- `pipe(f, g, ...)` returns a composed function that applies its arguments **left to right**: given a value `x`,
+  it produces `g(f(x))`.
+- `compose(f, g, ...)` returns a composed function that applies its arguments **right to left**: given a value
+  `x`, it produces `f(g(x))`.
+
+The composed result is passed to a higher-order consumer (such as `map` or `reduce`) rather than applied
+directly: there is no `pipe(f, g)(x)` syntactic form, since neither the blueprint language nor the substitution
+language allows a function call to follow another function call without an intervening accessor.
+
+The collection higher-order functions are also part of the core set:
+
+- `map(array, function)` applies the function to each element and returns the array of results.
+- `filter(array, predicate)` returns the elements for which the predicate is true.
+- `reduce(array, function, initial)` folds the array into a single value.
+- `flatmap(array, function)` maps then flattens by one level.
+- `sort(array, comparator)` sorts the array by the comparator function.
+
+A typical value chain is written as nested function calls, with the innermost call evaluated first:
+
+```blueprintlang
+value bucketSuffix: string {
+    value = substr(sha256(values.namePrefix), 0, 7)
+}
+```
+
+A higher-order function takes a function reference, either named or built up with `pipe` or `compose`:
+
+```blueprintlang
+value upperNames: array {
+    value = map(values.rawNames, to_upper)
+}
+
+value cleanNames: array {
+    value = map(values.rawNames, pipe(trim, to_upper))
+}
+```
+
+### none in Expressions
+
+Within an expression, `none` flows through function calls and combines with the surrounding form according to a
+small set of rules. The full per-function behaviour lives in
+[Special Values](/docs/bluelink/blueprints/core-functions#special-values); the headline rules are:
+
+**Propagation.** Most functions return `none` when any argument is `none`. This covers the string functions
+(`trim`, `replace`, `substr`, `to_upper`, ...), the numeric functions (`min`, `max`, `abs`), the
+encoding/hashing functions (`base64encode`, `sha256`, ...), and the boolean operators `&&`, `||`, and `!` (with
+`none` treated as falsy when combining). Propagation lets `none` flow cleanly through a chain of calls without
+the author guarding each step.
+
+**Special handling.** A few functions read `none` as a meaningful signal rather than propagating it:
+
+- `if(cond, a, b)`: a `none` condition is falsy and the `b` branch is taken. The branches themselves can be
+  `none` to omit a field on the false path.
+- `coalesce(a, b, ...)`: returns the first argument that is not `none`. Empty strings, empty arrays, and empty
+  objects count as present.
+- `first(a, b, ...)`: returns the first argument that is not `none`, `""`, or `[]`, that is, the first
+  meaningfully non-empty argument.
+- `lookup(obj, key)`: returns `none` when the key is missing, so callers can branch on absence.
+
+**Truthiness.** Boolean expressions and the `if` function accept only `true`, `false`, and `none`; there is no
+loose truthiness for `0`, `""`, `[]`, or other empty values. Convert other values to booleans with an explicit
+[comparison operator](#operators) or function such as `eq(..)`.
+
+**Interpolation.** When a `${..}` substitution evaluates to `none` inside a string literal, it is replaced with
+the empty string. For a meaningful default instead, wrap the expression with `coalesce`:
+
+```blueprintlang
+url = "https://${coalesce(variables.domain, "localhost")}/api"
+```
+
+**Arrays and objects.** A `none` element is filtered out of an array, and a `none` value drops the corresponding
+key from an object literal:
+
+```blueprintlang
+value items: array {
+    value = [
+        "required-item",
+        if(variables.includeOptional, "optional-item", none),
+        "another-item"
+    ]
+}
+
+value config: object {
+    value = {
+        required = "value",
+        optional = if(variables.flagSet, "value", none)
+    }
+}
+```
+
+When `includeOptional` is `false`, `items` materialises as `["required-item", "another-item"]`; when `flagSet`
+is `false`, `optional` is omitted from `config`. This is the same omission rule as at the field-assignment
+level (see [The none Value](#the-none-value)), now applied inside a literal.
+
+## Caveats
+
+The blueprint language inherits the spec-level [caveats](/docs/bluelink/blueprints/specification#caveats) and
+adds a small set of gotchas specific to its syntax. Each is detailed in the section it belongs to; this list is
+a single place to find them.
+
+### `${..}` and Shell Environment Variables
+
+The `${..}` form for [interpolation](#interpolation) shares its syntax with shell environment variable
+expansion, so pre-processing a blueprint file with a shell tool (envsubst, bash expansion, and similar) can
+silently rewrite substitutions or fail on missing variables. Feed deployment-time inputs through
+[variables](#variables) instead; the engine resolves `${..}` at deployment, not at file pre-processing time.
+
+This caveat is inherited from the
+[specification](/docs/bluelink/blueprints/specification#dealing-with-environment-variables).
+
+### `=` is Assignment, Not Equality
+
+`=` is the assignment token used in declaration blocks and object literals. Equality is `==`. A condition or
+filter written with a single `=` parses as an assignment in the wrong place; the blueprint language uniformly
+uses `==` regardless of position, including in [data source filters](#filters), and lowers to the canonical
+schema's filter operator name `=` on the YAML and JWCC side. See [Operators](#operators).
+
+### `{ }` is a Block or an Object Literal Depending on Position
+
+Curly braces (`{ }`) after a declaration header or level-1 sub-construct keyword represent a **block** (entries are `field = value`
+assignments and inline statements). `{ }` on the right of `=` is an **object literal** (entries are also
+`field = value` assignments, but the meaning is data, not a declaration body). The two forms share `{ }` and
+`field = value`; what distinguishes them is the position. See [Whitespace and Layout](#whitespace-and-layout)
+for the rule and the implications for separator style.
+
+### No Arithmetic, No Ternary
+
+The blueprint language has no arithmetic operators (`+`, `-`, `*`, `/`, `%`) and no ternary operator. Use the
+`min`, `max`, and `abs` core functions for numeric work, and the `if(cond, a, b)` function for conditional
+selection. Excluding `-` and `/` from the operator set is what lets `-` appear in
+[names](#identifiers-and-names) and `/` in [element types](#element-types) without quoting.
+
+### Operators Are Blueprint-Language Only
+
+The infix and unary operators (`==`, `!=`, `<`, `<=`, `>`, `>=`, `&&`, `||`, `!`) are sugar provided by the
+blueprint language; they are **not** part of the embedded substitution language used inside `${..}` in YAML and
+JWCC. An expression copied from a blueprint-language source into a `${..}` in YAML or JWCC must be rewritten in
+function-call form (`eq(a, b)`, `and(a, b)`, and so on). The blueprint language form `a == b && c > d` lowers
+to the canonical `${and(eq(a, b), gt(c, d))}` automatically (see [Operators](#operators)).
+
+Inside a blueprint-language string, `${..}` uses the blueprint expression grammar (operators included); the
+restriction applies only to `${..}` in YAML and JWCC.
+
+### Variables Cannot be Drilled into
+
+A `variables.<name>` reference resolves to a scalar; further `.field` or `[..]` accessors are not permitted,
+since [variables](#variables) are scalar by construction. To work with structured input, pass it in as a JSON
+string and decode it in expressions with the `jsondecode` core function.
+
+### `none` is Not `null`
+
+The blueprint language has no `null` value. Absence is expressed with [`none`](#the-none-value), which omits
+the containing field on materialisation rather than appearing as a present, null-valued field. The empty forms
+(`""`, `0`, `false`, `[]`, `{}`) are all distinct from `none`: they are present values whose content happens to
+be empty.
+
+## Formal Grammar
+
+The formal grammar for the blueprint language is given in two parts: the [Lexical Grammar](#lexical-grammar)
+defines the tokens (names, scalar literals, comments, string literals with interpolation) and the
+[Syntactic Grammar](#syntactic-grammar) defines the productions over those tokens (top-level structure,
+declarations, blocks, inline statements, and expressions). Both are written in
+[Extended Backus-Naur form](https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form), matching the
+style of the [Substitution Grammar](/docs/bluelink/blueprints/specification#substitution-grammar) in the
+specification.
+
+### Lexical Grammar
+
+A blueprint element is declared and referenced with an `element name`, which is either a bare `name` or a
+`quoted name` (see [Identifiers and Names](#identifiers-and-names)). The line comment, introduced by `#`, is the
+one token specific to the blueprint language (see [Comments](#comments)).
+
+The `name`, `quoted name`, and scalar literal (`bool literal`, `int literal`, `float literal`, `none literal`)
+productions are intentionally identical to those in the [Substitution Grammar](/docs/bluelink/blueprints/specification#substitution-grammar)
+so that names and literals are interchangeable between the blueprint language, YAML, and JWCC. The `string literal`
+production additionally permits `${..}` interpolation, which a substitution-internal string literal does not.
+
+```
+comment              =   "#" , { ? utf-8 char excluding newline ? } ;
+
+element name         =   name | quoted name ;
+name                 =   start name char , name chars ;
+name chars           =   { name char } ;
+name char            =   letter | digit | "_" | "-" ;
+start name char      =   letter | "_" ;
+quoted name          =   '"' , name in quotes , '"' ;
+name in quotes       =   { name in quotes char }- ;
+name in quotes char  =   letter | digit | "_" | "-" | "." ;
+
+string literal       =   single line string | multiline string ;
+single line string   =   '"' , { string char | interpolation } , '"' ;
+multiline string     =   '"""' , ? line break ? , { multiline char | interpolation } , '"""' ;
+interpolation        =   "${" , expression , "}" ;
+string char          =   ? utf-8 char excluding '"', line break, and the sequence "${" ? | escaped quote ;
+multiline char       =   ? utf-8 char excluding the sequences '"""' and "${" ? ;
+escaped quote        =   "\" , '"' ;
+# `escaped quote` is the only escape sequence in a string literal. All other
+# characters (including "\") are taken as literal; a literal "${" cannot be
+# written directly and must be produced inside a "${..}" by a function such
+# as `join(["$", "{...}"], "")`, whose substitution-internal string literals
+# pass `${` through as ordinary characters.
+# A multiline string's value is the text between the delimiters with the bounding line
+# breaks removed and the closing-delimiter indentation stripped from each line; see
+# the Multi-line Strings section.
+bool literal         =   "true" | "false" ;
+int literal          =   [ "-" ] , natural number ;
+float literal        =   [ "-" ] , natural number , "." , natural number ;
+none literal         =   "none" ;
+natural number       =   { digit }- ;
+
+letter               =   ? [A-Za-z] ? ;
+digit                =   ? [0-9] ? ;
+
+# `expression` is defined in the Syntactic Grammar below. Inside a `${..}`
+# interpolation, the blueprint language uses its own `expression` grammar,
+# which is wider than the substitution language used by `${..}` in YAML and
+# JWCC: blueprint-language operators and other sugar are available there.
+```
+
+### Syntactic Grammar
+
+The syntactic grammar defines the productions over the tokens from the [Lexical Grammar](#lexical-grammar). It
+covers the top-level structure of a blueprint, declarations, blocks and sub-constructs, inline statements
+(`filter` and `foreach`), and expressions. Token productions referenced below (`name`, `quoted name`,
+`string literal`, `int literal`, `float literal`, `bool literal`, `none literal`, `natural number`, `letter`,
+`digit`, `comment`) are defined in the lexical grammar above.
+
+Precedence and associativity for the expression operators are encoded in the production hierarchy
+(`or expr` lowest, `primary expr` highest); binary operators are left-associative and the unary `!` is
+right-associative. A line break at a binary-operator boundary or inside any `( )`, `[ ]`, or `{ }` grouping is
+treated as whitespace (see [Multi-line Expressions](#multi-line-expressions)); elsewhere a line break is a
+`separator` between block or object literal entries.
+
+Inter-token whitespace and `comment` tokens (defined in the lexical grammar) are stripped before the productions
+below are applied. A `name` that appears in a position requiring a bare identifier (declaration headers, bare
+resource references, function-call positions) must not be one of the [keywords](#keywords); the quoted-name form
+is required when a reserved word would otherwise occupy that position.
+
+```
+(* Top-level structure. The `version` directive must appear exactly once. The
+   `transform` directive and the top-level `metadata block` appear at most once
+   each. Items may otherwise appear in any order. *)
+
+blueprint                  =   { top level item }- ;
+top level item             =   version directive
+                             | transform directive
+                             | metadata block
+                             | declaration ;
+
+version directive          =   "version" , string literal ;
+transform directive        =   "transform" ,
+                               ( string literal
+                               | "[" , string literal , { "," , string literal } , [ "," ] , "]" ) ;
+
+(* Declarations *)
+
+declaration                =   variable decl
+                             | value decl
+                             | data decl
+                             | resource decl
+                             | include decl
+                             | export decl ;
+
+variable decl              =   "variable" , element name , ":" , variable type , block ;
+value decl                 =   "value" , element name , ":" , value type , block ;
+data decl                  =   "data" , element name , ":" , element type , data body ;
+resource decl              =   "resource" , element name , ":" , element type , resource body ;
+include decl               =   "include" , element name , string literal , include body ;
+export decl                =   "export" , element name , ":" , value type , block ;
+
+variable type              =   "string" | "integer" | "float" | "boolean" | element type ;
+value type                 =   "string" | "integer" | "float" | "boolean" | "array" | "object" ;
+data export type           =   "string" | "integer" | "float" | "boolean" | "array" ;
+element type               =   type segment , "/" , type segment , { "/" , type segment } ;
+type segment               =   letter , { letter | digit } ;
+
+(* Blocks and sub-constructs. A block follows a declaration header or a level-1
+   sub-construct keyword; its entries are separated by either a newline or a
+   comma. The `metadata block` form is used both at the top level and as a
+   sub-construct of a declaration. *)
+
+block                      =   "{" , [ block entry , { separator , block entry } , [ separator ] ] , "}" ;
+block entry                =   field assignment ;
+field assignment           =   field key , "=" , expression ;
+field key                  =   name | quoted name ;
+separator                  =   "," | ? line break ? ;
+
+data body                  =   "{" , [ data entry , { separator , data entry } , [ separator ] ] , "}" ;
+data entry                 =   field assignment
+                             | metadata sub
+                             | filter statement
+                             | data export statement ;
+
+resource body              =   "{" , [ resource entry , { separator , resource entry } , [ separator ] ] , "}" ;
+resource entry             =   field assignment
+                             | metadata sub
+                             | spec sub
+                             | select sub
+                             | foreach statement ;
+
+include body               =   "{" , [ include entry , { separator , include entry } , [ separator ] ] , "}" ;
+include entry              =   field assignment
+                             | metadata sub
+                             | variables sub ;
+
+metadata block             =   "metadata" , block ;
+metadata sub               =   "metadata" , block ;
+spec sub                   =   "spec" , block ;
+select sub                 =   "select" , "by" , selector kind , block ;
+selector kind              =   "label" ;
+                             (* In this version of the specification "label" is the only selector kind;
+                                additional kinds would be added here as the spec extends them. *)
+variables sub              =   "variables" , block ;
+
+(* Inline statements that appear inside data source and resource bodies. *)
+
+filter statement           =   "filter" , string literal , filter operator , expression ;
+filter operator            =   "==" | "!=" | "<" | "<=" | ">" | ">="
+                             | "in" | "not in"
+                             | "has key" | "not has key"
+                             | "contains" | "not contains"
+                             | "starts with" | "not starts with"
+                             | "ends with" | "not ends with" ;
+data export statement      =   "export" , ( "*" | data export item ) ;
+data export item           =   element name , [ "as" , element name ] , ":" , data export type , [ block ] ;
+foreach statement          =   "foreach" , expression ;
+
+(* Expressions. Lower precedence at the top, higher at the bottom. *)
+
+expression                 =   or expr ;
+or expr                    =   and expr , { "||" , and expr } ;
+and expr                   =   eq expr , { "&&" , eq expr } ;
+eq expr                    =   cmp expr , { ( "==" | "!=" ) , cmp expr } ;
+cmp expr                   =   unary expr , { ( "<" | "<=" | ">" | ">=" ) , unary expr } ;
+unary expr                 =   [ "!" ] , primary expr ;
+primary expr               =   literal
+                             | reference
+                             | function call
+                             | array literal
+                             | object literal
+                             | "(" , expression , ")" ;
+
+literal                    =   bool literal | int literal | float literal | none literal | string literal ;
+array literal              =   "[" , [ expression , { "," , expression } , [ "," ] ] , "]" ;
+object literal             =   "{" , [ object entry , { separator , object entry } , [ separator ] ] , "}" ;
+object entry               =   object key , "=" , expression ;
+object key                 =   name | object key string ;
+object key string          =   '"' , { ? utf-8 char excluding '"' ? | escaped quote } , '"' ;
+
+function call              =   name , "(" , [ function args ] , ")" , { name accessor | index accessor } ;
+function args              =   function arg , { "," , function arg } , [ "," ] ;
+function arg               =   ( name , "=" , expression ) | expression ;
+
+(* References. Each form mirrors the corresponding production in the substitution
+   grammar; the bare-name form of `resource reference` is the one piece of sugar
+   beyond what the substitution grammar carries. *)
+
+reference                  =   variable reference
+                             | value reference
+                             | resource reference
+                             | datasource reference
+                             | child reference
+                             | elem reference
+                             | elem index reference ;
+
+variable reference         =   "variables" , name accessor ;
+value reference            =   "values" , name accessor , { name accessor | index accessor } ;
+resource reference         =   ( "resources" , name accessor , [ index accessor ] , { name accessor | index accessor } )
+                             | ( name , [ index accessor ] , { name accessor | index accessor } ) ;
+datasource reference       =   "datasources" , name accessor , name accessor , [ index accessor ] ;
+child reference            =   "children" , name accessor , { name accessor | index accessor }- ;
+elem reference             =   "elem" , { name accessor | index accessor } ;
+elem index reference       =   "i" ;
+
+name accessor              =   ( "." , name ) | ( "[" , quoted name , "]" ) ;
+index accessor             =   "[" , [ natural number ] , "]" ;
+```
+
