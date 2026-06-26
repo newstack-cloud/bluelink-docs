@@ -1013,6 +1013,10 @@ select by label {
 Link selectors only match resources in the same blueprint; resources in a parent or child blueprint cannot be
 selected (see the [linkSelector specification](/docs/bluelink/blueprints/specification#linkselector)).
 
+A link selector is not the only way to activate a link. For some resource fields, a reference to another resource
+activates the link to that resource on its own, so a selector is not needed for that pair. See
+[links](/docs/bluelink/blueprints/links) for details.
+
 #### Conditions
 
 A `condition` controls whether the resource is created. It is an optional top-level field whose value is a

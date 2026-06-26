@@ -1648,6 +1648,10 @@ the cloud data store.
 The linkSelector query is only applied to resources within the same blueprint, it can **not** select resources that match the criteria in another blueprint. For example, resources in a child blueprint can **not** be selected by a linkSelector in a parent blueprint. Instead, blueprints must share data through [`variables`](#variables) and [`exports`](#exports).
 </Callout>
 
+<Callout title="Note" type="info">
+A `linkSelector` is one of two ways to activate a link. For some resource fields, a reference to another resource activates the link directly, with no `linkSelector` required. See [links](/docs/bluelink/blueprints/links) for details.
+</Callout>
+
 **field type** 
 
 [linkSelectorDefinitions](#linkselectordefinitions)
