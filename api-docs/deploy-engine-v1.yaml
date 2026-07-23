@@ -1991,6 +1991,16 @@ components:
           allOf:
             - $ref: "#/components/schemas/ResourceCompletionDurations"
           nullable: true
+        missingFromState:
+          type: boolean
+          description: |
+            Indicates that the terminal status was reported without any operation
+            being carried out because the resource has no persisted state.
+            The resource may have already been removed or was never created
+            (e.g. a previous deployment failed before reaching it).
+            This will be omitted when false.
+          example: true
+          nullable: true
 
     ChildDeploymentEvent:
       type: object
@@ -2079,6 +2089,16 @@ components:
           allOf:
             - $ref: "#/components/schemas/BlueprintInstanceCompletionDurations"
           nullable: true
+        missingFromState:
+          type: boolean
+          description: |
+            Indicates that the terminal status was reported without any operation
+            being carried out because the child blueprint has no persisted state.
+            The child blueprint may have already been removed or was never deployed
+            (e.g. a previous deployment failed before reaching it).
+            This will be omitted when false.
+          example: true
+          nullable: true
 
     LinkDeploymentEvent:
       type: object
@@ -2166,6 +2186,17 @@ components:
             - Intermediary Resources Update Rollback Complete (18)
           allOf:
             - $ref: "#/components/schemas/LinkCompletionDurations"
+          nullable: true
+        missingFromState:
+          type: boolean
+          description: |
+            Indicates that the terminal status was reported without any operation
+            being carried out because the link (or the state of a resource in
+            the link) has no persisted state.
+            The link may have already been removed or was never created
+            (e.g. a previous deployment failed before reaching it).
+            This will be omitted when false.
+          example: true
           nullable: true
 
     InstanceUpdateDeploymentEvent:
