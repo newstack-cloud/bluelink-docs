@@ -1909,12 +1909,26 @@ components:
             The high-level status of the resource.
             See the `ResourceState` schema definition for more information on what each status means.
           example: 2
-          enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+          enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
         preciseStatus:
           type: integer
           description: |
             The precise status of the resource.
             See the `ResourceState` schema definition for more information on what each status means.
+
+            Three of these statuses are reported on the event stream only and never
+            appear as the `preciseStatus` of a resource in the `ResourceState` schema:
+
+            - Updating Link Contributions (27) - The precise status used when a resource is being updated to carry what the links that contribute to it need its spec to say.
+            - Link Contributions Updated (28) - The precise status used when a resource has been updated with what the links contributing to it need its spec to say.
+            - Link Contributions Update Failed (29) - The precise status used when a resource could not be updated with what the links contributing to it need its spec to say.
+
+            A resource reaches these without any change to what the blueprint declares
+            about it, and often without appearing in the change set at all: an execution
+            role that several links write to is ordinarily untouched by a deployment
+            that changes one of those links. The update is a write made on behalf of
+            those links rather than a deployment of the resource, so it leaves the
+            resource's own recorded status as the deployment it last had.
           example: 3
           enum:
             [
@@ -1944,7 +1958,46 @@ components:
               23,
               24,
               25,
+              26,
+              27,
+              28,
+              29,
             ]
+        fromLinkContributions:
+          type: boolean
+          description: |
+            Indicates that the resource is being updated to carry what the links
+            contributing to it need its spec to say, rather than because something the
+            blueprint declares about it changed.
+
+            An event with this set is not a deployment of a change the user made. The
+            resource may not be in the change set at all, so anything reporting progress
+            by walking the change set has nowhere to put it, and anything treating a
+            status update as a change the user made would be reporting a change they did
+            not make.
+
+            This will be omitted when false.
+          example: true
+        linkContributors:
+          type: object
+          description: |
+            A mapping of a resource spec field path to the logical names of every link
+            that contributes to it, present on events that carry link contributions.
+
+            Several links contributing to one field is the ordinary case rather than a
+            corner of it: a shared execution role holds a policy statement from each of
+            the links that needs one, all appended to the same list. This is the same
+            question `linkOwnedFields` answers for a change set, asked of an update
+            rather than of a comparison, and answered with every link rather than one.
+          additionalProperties:
+            type: array
+            items:
+              type: string
+              example: ordersFunction::ordersTable
+          example:
+            spec.policies:
+              - archiveFunction::appQueue
+              - saveOrderFunction::ordersTable
         failureReasons:
           type: array
           description: |
@@ -2134,16 +2187,14 @@ components:
             The high-level status of the link.
             See the `LinkState` schema definition for more information on what each status means.
           example: 2
-          enum:
-            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+          enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
         preciseStatus:
           type: integer
           description: |
             The precise status of the link.
             See the `LinkState` schema definition for more information on what each status means.
           example: 3
-          enum:
-            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+          enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
         failureReasons:
           type: array
           description: |
@@ -2172,18 +2223,14 @@ components:
             Duration information for a link deployment.
             Duration information is attached on one of the following precise status updates:
 
-            - Resource A Updated (2)
-            - Resource A Update Failed (3)
-            - Resource A Update Rollback Failed (5)
-            - Resource A Update Rollback Complete (6)
-            - Resource B Updated (8)
-            - Resource B Update Failed (9)
-            - Resource B Update Rollback Failed (11)
-            - Resource B Update Rollback Complete (12)
-            - Intermediary Resources Updated (14)
-            - Intermediary Resources Update Failed (15)
-            - Intermediary Resources Update Rollback Failed (17)
-            - Intermediary Resources Update Rollback Complete (18)
+            - Linked Resources Updated (2)
+            - Linked Resources Update Failed (3)
+            - Linked Resources Update Rollback Failed (5)
+            - Linked Resources Update Rollback Complete (6)
+            - Intermediary Resources Updated (8)
+            - Intermediary Resources Update Failed (9)
+            - Intermediary Resources Update Rollback Failed (11)
+            - Intermediary Resources Update Rollback Complete (12)
           allOf:
             - $ref: "#/components/schemas/LinkCompletionDurations"
           nullable: true
@@ -2434,7 +2481,7 @@ components:
             The high-level status of the resource.
             See the `ResourceState` schema definition for more information on what each status means.
           example: 3
-          enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+          enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
         preciseStatus:
           type: integer
           description: |
@@ -2469,6 +2516,7 @@ components:
               23,
               24,
               25,
+              26,
             ]
         failureReasons:
           type: array
@@ -2501,42 +2549,14 @@ components:
             The high-level status of the link.
             See the `LinkState` schema definition for more information on what each status means.
           example: 3
-          enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+          enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
         preciseStatus:
           type: integer
           description: |
             The precise status of the link.
             See the `LinkState` schema definition for more information on what each status means.
           example: 4
-          enum:
-            [
-              0,
-              1,
-              2,
-              3,
-              4,
-              5,
-              6,
-              7,
-              8,
-              9,
-              10,
-              11,
-              12,
-              13,
-              14,
-              15,
-              16,
-              17,
-              18,
-              19,
-              20,
-              21,
-              22,
-              23,
-              24,
-              25,
-            ]
+          enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
         failureReasons:
           type: array
           description: Reasons for failure if the link failed.
@@ -3337,6 +3357,33 @@ components:
             - accept_external
             - update_status
             - manual_cleanup_required
+        unappliedLinkContributions:
+          type: array
+          description: |
+            Contributions links record against this resource that could not be
+            composed into the spec the drift was measured against.
+
+            A drift check compares the resource as it was deployed, which includes
+            what links wrote to it, against the resource as it is. Where a
+            contribution could not be composed, the deployed side is missing a field
+            the live resource holds, so a difference may be reported that was not
+            caused by a change to the resource. These say which part of the picture
+            could not be assembled.
+          items:
+            type: object
+            properties:
+              linkName:
+                type: string
+                description: The logical name of the link that owns the field.
+                example: appVpc::statsFunction
+              fieldPath:
+                type: string
+                description: The path in the resource spec the link owns.
+                example: spec.policies[0].policyDocument.statement[0]
+              reason:
+                type: string
+                description: Why the contribution could not be composed.
+                example: the value to inject does not match the selector that would locate it
 
     LinkReconcileResult:
       type: object
@@ -3841,6 +3888,50 @@ components:
             type: string
             description: The name of the field that will be computed.
             example: my-computed-field
+        linkOwnedFields:
+          type: object
+          description: |
+            A mapping of a resource spec field path to the logical name of the
+            link that contributes the value at that path.
+
+            A link writes fields that the blueprint does not declare, so a
+            change to one of them is not something the author of the blueprint
+            wrote and cannot be explained by reading it. The field paths appear
+            in `modifiedFields`, `newFields` and `removedFields` like any other,
+            and this says which link each one belongs to, so that a removal can
+            be reported as the loss of what a named link contributes.
+          additionalProperties:
+            type: string
+            description: The logical name of the link that contributes the field.
+            example: ordersFunction::ordersTable
+          example:
+            spec.environment.variables.TABLE_NAME_ordersTable: ordersFunction::ordersTable
+        unappliedLinkFields:
+          type: array
+          description: |
+            Contributions a link records against this resource that could not be
+            composed into its spec.
+
+            Each one is a field the deployed resource holds that the change set
+            could not account for, so it appears in none of `modifiedFields`,
+            `newFields` or `removedFields`. Deploying without resolving it removes
+            that field from the live resource, so it is reported here rather than
+            being left absent from the change set without explanation.
+          items:
+            type: object
+            properties:
+              linkName:
+                type: string
+                description: The logical name of the link that owns the field.
+                example: appVpc::statsFunction
+              fieldPath:
+                type: string
+                description: The path in the resource spec the link owns.
+                example: spec.policies[0].policyDocument.statement[0]
+              reason:
+                type: string
+                description: Why the contribution could not be composed.
+                example: the value to inject does not match the selector that would locate it
         fieldChangesKnownOnDeploy:
           type: array
           description: |
@@ -4073,6 +4164,13 @@ components:
             - Update Interrupted (24) - The precise status used when a resource update was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state of the resource is unknown and needs reconciliation.
             - Destroy Interrupted (25) - The precise status used when a resource destruction was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state of the resource is unknown and needs reconciliation.
             - Retained (26) - The precise status used when a resource has been removed from the blueprint's managed state without destroying the underlying infrastructure, as a result of the resource having a removal policy of `retain`.
+
+            The deployment event stream reports three further precise statuses, 27 to 29,
+            for a resource being updated to carry what the links contributing to it need
+            its spec to say. They are absent here deliberately rather than by omission:
+            that update is a write made on behalf of those links and not a deployment of
+            the resource, so it leaves the resource's recorded status as the deployment it
+            last had. See the `ResourceDeploymentEvent` schema for what they mean.
           example: 3
           enum:
             [
@@ -4195,6 +4293,73 @@ components:
             - delete
             - retain
           example: retain
+        linkContributionFailures:
+          type: array
+          description: |
+            The layers of link contributions that the last deployment could not apply
+            to this resource, one entry per failed layer.
+
+            A resource can deploy successfully and still be left without what the links
+            that write to it contribute, because the update carrying those contributions
+            is applied after the resource's own deployment and is not part of its
+            lifecycle. The resource's `status` and `failureReasons` therefore describe
+            only its own deployment, and this describes what its links could not give it.
+
+            Omitted when the last deployment applied every layer of contributions, and
+            for a resource that no link contributes to.
+          items:
+            type: object
+            properties:
+              layerDepth:
+                type: integer
+                description: |
+                  The depth in the capability ordering of the links whose contributions
+                  this layer carries. A resource with no ordering over the links that
+                  contribute to it has a single layer, at depth 0.
+                example: 0
+              reasons:
+                type: array
+                description: |
+                  Why the layer could not be applied, where the failure belongs to the
+                  update as a whole rather than to a particular contribution.
+                items:
+                  type: string
+                  description: Why the layer could not be applied.
+                  example: the resource "ordersTable" that links contribute to is not deployed, so the contributions made to it cannot be applied
+              unappliedContributions:
+                type: array
+                description: |
+                  The individual contributions that could not be composed, where the
+                  failure can be attributed to particular fields.
+                items:
+                  type: object
+                  properties:
+                    linkName:
+                      type: string
+                      description: The logical name of the link that owns the field.
+                      example: appVpc::statsFunction
+                    fieldPath:
+                      type: string
+                      description: The path in the resource spec the link owns.
+                      example: spec.policies[0].policyDocument.statement[0]
+                    reason:
+                      type: string
+                      description: Why the contribution could not be composed.
+                      example: the field is also set to a different value by ordersApi::statsFunction, so which value the resource holds would depend on the order the links ran in
+              contributingLinks:
+                type: array
+                description: |
+                  The logical names of the links whose contributions this layer was
+                  carrying. Recorded at the time of the failure, so a link later removed
+                  from the blueprint is still named here.
+                items:
+                  type: string
+                  description: The logical name of a link contributing to this layer.
+                  example: appVpc::statsFunction
+              timestamp:
+                type: integer
+                description: The unix timestamp of when the layer failed to apply.
+                example: 1678901234
         drifted:
           type: boolean
           description: |
@@ -4887,8 +5052,7 @@ components:
             - Update Interrupted (20) - The status used when a link update was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state of the link is unknown and needs reconciliation.
             - Destroy Interrupted (21) - The status used when a link destruction was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state of the link is unknown and needs reconciliation.
           example: 2
-          enum:
-            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+          enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
         preciseStatus:
           type: integer
           description: |
@@ -4897,30 +5061,22 @@ components:
             The following precise status codes are supported:
 
             - Unknown (0) - The precise status used when we can't determine an accurate status for a link.
-            - Updating Resource A (1) - The precise status used when the configuration for a link is being applied to resource A in the link.
-            - Resource A Updated (2) - The precise status used when the configuration for a link has been applied to resource A in the link.
-            - Resource A Update Failed (3) - The precise status used when the configuration for a link has failed to be applied to resource A in the link.
-            - Resource A Update Rolling Back (4) - The precise status used when another change in the same blueprint has failed and the current link for which resource A was successfully updated is being rolled back.
-            - Resource A Update Rollback Failed (5) - The precise status used when another change in the same blueprint has failed and the current link for which resource A was successfully updated could not be rolled back.
-            - Resource A Update Rollback Complete (6) - The precise status used when another change in the same blueprint has failed and the current link for which resource A was successfully updated has been rolled back.
-            - Updating Resource B (7) - The precise status used when the configuration for a link is being applied to resource B in the link.
-            - Resource B Updated (8) - The precise status used when the configuration for a link has been applied to resource B in the link.
-            - Resource B Update Failed (9) - The precise status used when the configuration for a link has failed to be applied to resource B in the link.
-            - Resource B Update Rolling Back (10) - The precise status used when another change in the same blueprint has failed and the current link for which resource B was successfully updated is being rolled back.
-            - Resource B Update Rollback Failed (11) - The precise status used when another change in the same blueprint has failed and the current link for which resource B was successfully updated could not be rolled back.
-            - Resource B Update Rollback Complete (12) - The precise status used when another change in the same blueprint has failed and the current link for which resource B was successfully updated has been rolled back.
-            - Updating Intermediary Resources (13) - The precise status used when intermediary resources are being created, updated or destroyed. This status is a high level of indication of progress, the status of each intermediary resource should be checked to determine the extract state of each intermediary resource in the link.
-            - Intermediary Resources Updated (14) - The precise status used when all intermediary resources have been successfully updated, created or destroyed.
-            - Intermediary Resource Update Failed (15) - The precise status used when an intermediary resource has failed to be updated, created or destroyed.
-            - Intermediary Resource Update Rolling Back (16) - The precise status used when another change in the same blueprint has failed and the current link for which intermediary resources were successfully updated is being rolled back.
-            - Intermediary Resource Update Rollback Failed (17) - The precise status used when another change in the same blueprint has failed and the current link for which intermediary resources were successfully updated failed to be rolled back.
-            - Intermediary Resource Update Rollback Complete (18) - The precise status used when another change in the same blueprint has failed and the current link for which intermediary resources were succesfully updated has been rolled back.
-            - Resource A Update Interrupted (19) - The precise status used when the resource A update for a link was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state is unknown and needs reconciliation.
-            - Resource B Update Interrupted (20) - The precise status used when the resource B update for a link was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state is unknown and needs reconciliation.
-            - Intermediary Resources Update Interrupted (21) - The precise status used when the intermediary resources update for a link was interrupted due to deployment being cancelled (e.g., drain timeout after terminal failure). The actual state is unknown and needs reconciliation.
+            - Updating Linked Resources (1) - The precise status used when the configuration for a link is being applied to the resources it relates. A link is handed both of its resources together and writes whichever of them it declared it modifies, so the two are updated as one step rather than in sequence.
+            - Linked Resources Updated (2) - The precise status used when the configuration for a link has been applied to the resources it relates.
+            - Linked Resources Update Failed (3) - The precise status used when the configuration for a link has failed to be applied to the resources it relates.
+            - Linked Resources Update Rolling Back (4) - The precise status used when another change in the same blueprint has failed and the current link, whose resources were successfully updated, is being rolled back.
+            - Linked Resources Update Rollback Failed (5) - The precise status used when another change in the same blueprint has failed and the current link, whose resources were successfully updated, could not be rolled back.
+            - Linked Resources Update Rollback Complete (6) - The precise status used when another change in the same blueprint has failed and the current link, whose resources were successfully updated, has been rolled back.
+            - Updating Intermediary Resources (7) - The precise status used when intermediary resources are being created, updated or destroyed. This status is a high level indication of progress; the status of each intermediary resource should be checked to determine the exact state of each intermediary resource in the link.
+            - Intermediary Resources Updated (8) - The precise status used when all intermediary resources have been successfully updated, created or destroyed.
+            - Intermediary Resources Update Failed (9) - The precise status used when an intermediary resource has failed to be updated, created or destroyed.
+            - Intermediary Resources Update Rolling Back (10) - The precise status used when another change in the same blueprint has failed and the current link, whose intermediary resources were successfully updated, is being rolled back.
+            - Intermediary Resources Update Rollback Failed (11) - The precise status used when another change in the same blueprint has failed and the current link, whose intermediary resources were successfully updated, failed to be rolled back.
+            - Intermediary Resources Update Rollback Complete (12) - The precise status used when another change in the same blueprint has failed and the current link, whose intermediary resources were successfully updated, has been rolled back.
+            - Linked Resources Update Interrupted (13) - The precise status used when the update of a link's resources was interrupted, either because the deployment was cancelled (e.g. drain timeout after terminal failure) or because a resource the link required could not be given what it needs. The actual state is unknown and needs reconciliation.
+            - Intermediary Resources Update Interrupted (14) - The precise status used when the intermediary resources update for a link was interrupted due to the deployment being cancelled (e.g. drain timeout after terminal failure). The actual state is unknown and needs reconciliation.
           example: 2
-          enum:
-            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+          enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
         lastStatusUpdateTimestamp:
           type: integer
           description: The unix timestamp when the link deployment status was last updated.
@@ -5082,19 +5238,14 @@ components:
     LinkCompletionDurations:
       type: object
       properties:
-        resourceAUpdate:
+        linkedResourcesUpdate:
           type: object
           description: |
-            Duration information for the update of resource A in the link.
-            This will only be present if the link has reached resource A updated status.
-          allOf:
-            - $ref: "#/components/schemas/LinkComponentCompletionDurations"
-          nullable: true
-        resourceBUpdate:
-          type: object
-          description: |
-            Duration information for the update of resource B in the link.
-            This will only be present if the link has reached resource B updated status.
+            Duration information for the update of the blueprint-declared resources the
+            link relates. A link is handed both of its resources together and writes
+            whichever of them it declared it modifies, so there is one duration for the
+            update rather than one per side.
+            This will only be present if the link has reached linked resources updated status.
           allOf:
             - $ref: "#/components/schemas/LinkComponentCompletionDurations"
           nullable: true
