@@ -569,21 +569,25 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@fumadocs/mdx-remote@npm:^1.4.0":
-  version: 1.4.0
-  resolution: "@fumadocs/mdx-remote@npm:1.4.0"
+"@fumadocs/mdx-remote@npm:^1.5.1":
+  version: 1.5.2
+  resolution: "@fumadocs/mdx-remote@npm:1.5.2"
   dependencies:
-    "@mdx-js/mdx": "npm:^3.1.0"
-    gray-matter: "npm:^4.0.3"
-    zod: "npm:^4.0.5"
+    "@mdx-js/mdx": "npm:^3.1.1"
+    unified: "npm:^11.0.5"
+    vfile: "npm:^6.0.3"
+    yaml: "npm:^2.9.0"
   peerDependencies:
+    "@types/mdx": "*"
     "@types/react": "*"
-    fumadocs-core: ^14.0.0 || ^15.0.0
+    fumadocs-core: ^15.0.0 || ^16.0.0
     react: 18.x.x || 19.x.x
   peerDependenciesMeta:
+    "@types/mdx":
+      optional: true
     "@types/react":
       optional: true
-  checksum: 10c0/dbdb816d8f13404ca4236a79b233e2012d379be9fef1cb2acba3c678630c193adc4ea890e8b44540b0017400b57a912eaa18bd14fd4311ff752e3833d25e5a3b
+  checksum: 10c0/68f07f30dc4c9ec42924239ca9a21222a231337d93a652d163ea16c6b8f4b19dc259487d6bdd4944e0f27041b26c9e97eeb4afc68e61bc4211ee907685c0656b
   languageName: node
   linkType: hard
 
@@ -915,7 +919,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@mdx-js/mdx@npm:^3.1.0, @mdx-js/mdx@npm:^3.1.1":
+"@mdx-js/mdx@npm:^3.1.1":
   version: 3.1.1
   resolution: "@mdx-js/mdx@npm:3.1.1"
   dependencies:
@@ -959,10 +963,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@next/env@npm:15.5.7":
-  version: 15.5.7
-  resolution: "@next/env@npm:15.5.7"
-  checksum: 10c0/f92d99e5fa3516c6b7699abafd9bd813f5c1889dd257ab098f1b71f93137f5e4f49792e22f6dddf8a59efcb134e8e84277c983ff88607b2a42aac651bfde78ea
+"@next/env@npm:15.5.10":
+  version: 15.5.10
+  resolution: "@next/env@npm:15.5.10"
+  checksum: 10c0/fb26c299ff388a3a0b2d14379616e3e59fe7960002e5aa67be4d195a377b9803fb93dd90067a5eb7d889d6f437aff091171701eec0e8d201666160269dda4e95
   languageName: node
   linkType: hard
 
@@ -3035,7 +3039,7 @@ __metadata:
   resolution: "bluelink-docs@workspace:."
   dependencies:
     "@eslint/eslintrc": "npm:^3"
-    "@fumadocs/mdx-remote": "npm:^1.4.0"
+    "@fumadocs/mdx-remote": "npm:^1.5.1"
     "@headlessui/react": "npm:^2.2.7"
     "@heroicons/react": "npm:^2.2.0"
     "@scalar/openapi-parser": "npm:^0.20.5"
@@ -3053,7 +3057,7 @@ __metadata:
     fumadocs-openapi: "npm:^9.3.8"
     fumadocs-ui: "npm:15.7.11"
     lucide-react: "npm:^0.543.0"
-    next: "npm:15.5.7"
+    next: "npm:15.5.10"
     next-validate-link: "npm:^1.6.0"
     postcss: "npm:^8.5.6"
     react: "npm:^19.1.1"
@@ -6294,11 +6298,11 @@ __metadata:
   languageName: node
   linkType: hard
 
-"next@npm:15.5.7":
-  version: 15.5.7
-  resolution: "next@npm:15.5.7"
+"next@npm:15.5.10":
+  version: 15.5.10
+  resolution: "next@npm:15.5.10"
   dependencies:
-    "@next/env": "npm:15.5.7"
+    "@next/env": "npm:15.5.10"
     "@next/swc-darwin-arm64": "npm:15.5.7"
     "@next/swc-darwin-x64": "npm:15.5.7"
     "@next/swc-linux-arm64-gnu": "npm:15.5.7"
@@ -6349,7 +6353,7 @@ __metadata:
       optional: true
   bin:
     next: dist/bin/next
-  checksum: 10c0/baf5b9f42416c478702b3894479b3d7862bc4abf18afe0e43b7fc7ed35567b8dc6cb76cd94906505bab9013cb8d0f3370cdc0451c01ec15ae5a638d37b5ba7c7
+  checksum: 10c0/ebf358cfc13e856ac2d60f6b1eb166560c541796d3422d6719712c0e8038626407f6075cb0d2805d9d6392404a5b0e63e501515982d78d7e934b721ea9753b17
   languageName: node
   linkType: hard
 
@@ -7964,7 +7968,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"vfile@npm:^6.0.0":
+"vfile@npm:^6.0.0, vfile@npm:^6.0.3":
   version: 6.0.3
   resolution: "vfile@npm:6.0.3"
   dependencies:
@@ -8098,6 +8102,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"yaml@npm:^2.9.0":
+  version: 2.9.1
+  resolution: "yaml@npm:2.9.1"
+  bin:
+    yaml: bin.mjs
+  checksum: 10c0/9d06676ef02b89559a8b10a71882bd2cdae81e8393dc8dbc871615c3259475d9609ad973d19cb3c9e71e72d6206e3d1e7aa241c7e55f3d16fd2e77db305827d6
+  languageName: node
+  linkType: hard
+
 "yocto-queue@npm:^0.1.0":
   version: 0.1.0
   resolution: "yocto-queue@npm:0.1.0"
@@ -8112,7 +8125,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"zod@npm:^4.0.5, zod@npm:^4.1.5":
+"zod@npm:^4.1.5":
   version: 4.1.8
   resolution: "zod@npm:4.1.8"
   checksum: 10c0/5eae39da09d7bd0564a30dfd2348811e4e2e7dd15955d8f3444f8e196f35e5422b1482eda234b722fafb0738f4a8b718adb042b860936bfdd2cc19cdbdac8a9a

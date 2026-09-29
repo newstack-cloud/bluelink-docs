@@ -15,7 +15,7 @@
     "fetch-releases": "node scripts/fetch-releases.mjs"
   },
   "dependencies": {
-    "@fumadocs/mdx-remote": "^1.4.0",
+    "@fumadocs/mdx-remote": "^1.5.1",
     "@headlessui/react": "^2.2.7",
     "@heroicons/react": "^2.2.0",
     "@scalar/openapi-parser": "^0.20.5",
@@ -25,7 +25,7 @@
     "fumadocs-openapi": "^9.3.8",
     "fumadocs-ui": "15.7.11",
     "lucide-react": "^0.543.0",
-    "next": "15.5.7",
+    "next": "15.5.10",
     "next-validate-link": "^1.6.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
