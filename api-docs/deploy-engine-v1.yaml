@@ -50,7 +50,7 @@ info:
     For blueprint instance deployments, where the same instance ID can be deployed multiple times, the next stream will become available as soon as the first event from the
     new deployment process has been received and saved.
 
-    When making a request to one of the `*/events` stream endpoints, the Deploy Engine will queue events server-side if the client is not yet connected to the stream. This allows the client to receive events that have occurred in the time between the process starting and the client connecting to the stream. These events will be queued server-side and will be cleaned up after an amount of time that will be configured for the Deploy Engine instance.
+    When making a request to one of the `*/stream` endpoints, the Deploy Engine will queue events server-side if the client is not yet connected to the stream. This allows the client to receive events that have occurred in the time between the process starting and the client connecting to the stream. These events will be queued server-side and will be cleaned up after an amount of time that will be configured for the Deploy Engine instance.
 
     The endpoints to retrieve change sets and deployment instances are also provided to allow the client to retrieve the full picture of the current state of these entity types.
     Blueprint validation results are only available as events, so clients must build up a full picture of the validation results from the event stream.
@@ -81,6 +81,12 @@ info:
 
     See the [Authentication](/docs/bluelink/auth) documentation to read more about the authentication mechanisms supported by the Deploy Engine.
 
+    Every endpoint in this reference requires authentication.
+
+    ### Request IDs
+
+    Clients can send an `X-Request-Id` header with any request to correlate it with the Deploy Engine's logs and audit trail. The value is used as the request's correlation ID as supplied; when the header is absent, the Deploy Engine generates one. The ID is not echoed back in a response header.
+
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
@@ -104,6 +110,16 @@ tags:
     description: Endpoints for change staging and deployments.
   - name: Events
     description: Endpoints for managing events across validation, change staging and deployments.
+  - name: Audit
+    description: |
+      Endpoints for reading the audit trail of actions taken through the Deploy Engine.
+
+      The trail is written by the engine itself as it answers requests; there is no endpoint
+      that creates or amends a record.
+  - name: State
+    description: |
+      Endpoints for maintaining the state backend itself, rather than any one category
+      of state.
 
 paths:
   /validations:
@@ -118,6 +134,7 @@ paths:
       operationId: createBlueprintValidation
       parameters:
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
         - name: checkBlueprintVars
           in: query
           schema:
@@ -190,6 +207,7 @@ paths:
       operationId: getBlueprintValidation
       parameters:
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
         - name: id
           in: path
           required: true
@@ -239,6 +257,7 @@ paths:
       operationId: streamBlueprintValidationEvents
       parameters:
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
         - name: id
           in: path
           required: true
@@ -287,19 +306,18 @@ paths:
                     example: diagnostic
                     enum:
                       - diagnostic
+                      - error
                   id:
                     type: string
-                    description: The ID of the event.
+                    description: |
+                      The ID of the event.
+                      Not sent for an `error` event.
                     example: 60d7c6c5-3984-42b9-a3c1-ae8a47a9bf55
                   data:
-                    $ref: "#/components/schemas/BlueprintValidationEvent"
+                    oneOf:
+                      - $ref: "#/components/schemas/BlueprintValidationEvent"
+                      - $ref: "#/components/schemas/StreamErrorEvent"
 
-        "404":
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/NotFoundError"
         "401":
           description: Unauthorized
           content:
@@ -327,6 +345,7 @@ paths:
       operationId: cleanUpBlueprintValidations
       parameters:
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
       responses:
         "202":
           description: Blueprint validation cleanup has been started.
@@ -334,18 +353,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CleanupStartedResponse"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/BadRequestError"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorisedError"
+        "409":
+          description: |
+            A cleanup for this category is already in progress, so this request started
+            nothing. Another caller may have started one, or the Deploy Engine may be
+            running one on its own schedule. Across several Deploy Engines sharing a state
+            backend this is best effort, since the only evidence another engine is mid-run
+            is the cleanup operation it recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CleanupInProgressError"
+        "503":
+          description: |
+            The Deploy Engine is shutting down, so the cleanup was not started.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceUnavailableError"
         default:
           description: Unexpected error
           content:
@@ -369,6 +400,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/cleanupOperationIdParam"
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
       responses:
         "200":
           description: Cleanup operation status retrieved successfully.
@@ -376,12 +408,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CleanupOperation"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/BadRequestError"
         "401":
           description: Unauthorized
           content:
@@ -389,7 +415,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorisedError"
         "404":
-          description: Cleanup operation not found
+          description: |
+            Cleanup operation not found. An operation started through another cleanup endpoint
+            is also reported as not found, so that this endpoint only reports on operations
+            of its own category.
           content:
             application/json:
               schema:
@@ -431,6 +460,7 @@ paths:
       operationId: createChangeSet
       parameters:
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
       requestBody:
         $ref: "#/components/requestBodies/CreateChangeSetBody"
       responses:
@@ -446,8 +476,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BadRequestError"
+        "404":
+          description: |
+            `destroy` is true and the instance named by `instanceName` does not exist.
+            A destroy change set needs an existing instance, so the name is not taken
+            as a new deployment as it is when `destroy` is false.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotFoundError"
         "422":
-          description: Uprocessable entity (input or source blueprint validation failed)
+          description: |
+            Unprocessable entity. Request-field validation or plugin configuration
+            validation failed.
+
+            Errors loading or validating the source blueprint document are not
+            reported here. The change staging process loads the blueprint after the
+            change set has been created, so those errors arrive as an `error` event
+            on the change staging stream.
           content:
             application/json:
               schema:
@@ -481,6 +527,7 @@ paths:
       operationId: getChangeSet
       parameters:
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
         - name: id
           in: path
           required: true
@@ -530,6 +577,7 @@ paths:
       operationId: streamChangeStagingEvents
       parameters:
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
         - name: id
           in: path
           required: true
@@ -585,17 +633,15 @@ paths:
                       - error
                   id:
                     type: string
-                    description: The ID of the event.
+                    description: |
+                      The ID of the event.
+                      Not sent for an `error` event that carries a `StreamErrorEvent`.
                     example: 60d7c6c5-3984-42b9-a3c1-ae8a47a9bf55
                   data:
-                    $ref: "#/components/schemas/ChangeStagingEvent"
+                    oneOf:
+                      - $ref: "#/components/schemas/ChangeStagingEvent"
+                      - $ref: "#/components/schemas/StreamErrorEvent"
 
-        "404":
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/NotFoundError"
         "401":
           description: Unauthorized
           content:
@@ -623,6 +669,7 @@ paths:
       operationId: cleanUpChangeSets
       parameters:
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
       responses:
         "202":
           description: Change set cleanup has been started.
@@ -630,18 +677,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CleanupStartedResponse"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/BadRequestError"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorisedError"
+        "409":
+          description: |
+            A cleanup for this category is already in progress, so this request started
+            nothing. Another caller may have started one, or the Deploy Engine may be
+            running one on its own schedule. Across several Deploy Engines sharing a state
+            backend this is best effort, since the only evidence another engine is mid-run
+            is the cleanup operation it recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CleanupInProgressError"
+        "503":
+          description: |
+            The Deploy Engine is shutting down, so the cleanup was not started.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceUnavailableError"
         default:
           description: Unexpected error
           content:
@@ -665,6 +724,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/cleanupOperationIdParam"
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
       responses:
         "200":
           description: Cleanup operation status retrieved successfully.
@@ -672,12 +732,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CleanupOperation"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/BadRequestError"
         "401":
           description: Unauthorized
           content:
@@ -685,7 +739,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorisedError"
         "404":
-          description: Cleanup operation not found
+          description: |
+            Cleanup operation not found. An operation started through another cleanup endpoint
+            is also reported as not found, so that this endpoint only reports on operations
+            of its own category.
           content:
             application/json:
               schema:
@@ -707,11 +764,14 @@ paths:
       summary: Clean up Reconciliation Results
       description: |
         Clean up reconciliation results that are older than the retention period
-        configured for the Deploy Engine instance. Reconciliation results are
-        created when checking for drift or interrupted state in blueprint instances.
+        configured for the Deploy Engine instance. A reconciliation result is saved
+        when change staging stops with a `DRIFT_DETECTED` status, so that a later
+        deployment blocked by the drift can return it. The reconciliation check
+        endpoint does not save one.
       operationId: cleanUpReconciliationResults
       parameters:
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
       responses:
         "202":
           description: Reconciliation results cleanup has been started.
@@ -719,18 +779,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CleanupStartedResponse"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/BadRequestError"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorisedError"
+        "409":
+          description: |
+            A cleanup for this category is already in progress, so this request started
+            nothing. Another caller may have started one, or the Deploy Engine may be
+            running one on its own schedule. Across several Deploy Engines sharing a state
+            backend this is best effort, since the only evidence another engine is mid-run
+            is the cleanup operation it recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CleanupInProgressError"
+        "503":
+          description: |
+            The Deploy Engine is shutting down, so the cleanup was not started.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceUnavailableError"
         default:
           description: Unexpected error
           content:
@@ -754,6 +826,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/cleanupOperationIdParam"
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
       responses:
         "200":
           description: Cleanup operation status retrieved successfully.
@@ -761,12 +834,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CleanupOperation"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/BadRequestError"
         "401":
           description: Unauthorized
           content:
@@ -774,7 +841,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorisedError"
         "404":
-          description: Cleanup operation not found
+          description: |
+            Cleanup operation not found. An operation started through another cleanup endpoint
+            is also reported as not found, so that this endpoint only reports on operations
+            of its own category.
           content:
             application/json:
               schema:
@@ -801,6 +871,7 @@ paths:
       operationId: listBlueprintInstances
       parameters:
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
         - name: search
           in: query
           required: false
@@ -837,7 +908,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/ListBlueprintInstancesResponse"
         "400":
-          description: Bad request
+          description: |
+            Bad request. `offset` or `limit` is not a non-negative integer, for example
+            `{"message":"offset must be a non-negative integer"}`.
           content:
             application/json:
               schema:
@@ -868,13 +941,12 @@ paths:
         It will return a blueprint instance resource containing an ID that can be used to
         stream deployment events as they occur.
 
-        If the change set was created from an existing instance that has resources
-        in a drifted or interrupted state, the operation will be blocked with a
-        409 Conflict response. Use the reconciliation endpoints to resolve drift
-        before retrying.
+        An `instanceName` that already belongs to an instance is rejected with a `409`,
+        use `updateBlueprintInstance` to deploy changes to an existing instance.
       operationId: createBlueprintInstance
       parameters:
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
       requestBody:
         $ref: "#/components/requestBodies/CreateBlueprintInstanceBody"
       responses:
@@ -885,13 +957,34 @@ paths:
               schema:
                 $ref: "#/components/schemas/BlueprintInstanceResponse"
         "400":
-          description: Bad request
+          description: |
+            Bad request. The request body could not be decoded, the blueprint location
+            could not be resolved, or the change set given by `changeSetId` does not exist
+            (`requested change set is missing`).
+
+            A change set created for a destroy operation is rejected with
+            `{"message":"cannot deploy using a destroy changeset","code":"DESTROY_CHANGESET"}`.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/BadRequestError"
+        "409":
+          description: |
+            Conflict. A blueprint instance with the requested `instanceName` already exists,
+            including one created by a concurrent request for the same name. The response
+            carries the `INSTANCE_ALREADY_EXISTS` code and the ID of the existing instance.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstanceAlreadyExistsError"
         "422":
-          description: Uprocessable entity (input or source blueprint validation failed)
+          description: |
+            Unprocessable entity. Request-field validation or plugin configuration
+            validation failed, or the deployment could not be started because the source
+            blueprint failed to load.
+
+            A missing `instanceName` is reported as a request-field error with the
+            location `.instanceName`.
           content:
             application/json:
               schema:
@@ -902,14 +995,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorisedError"
-        "409":
-          description: |
-            Operation blocked due to drift or interrupted state.
-            Use the reconciliation endpoints to resolve drift before retrying.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DriftBlockedResponse"
         default:
           description: Unexpected error
           content:
@@ -923,6 +1008,7 @@ paths:
   /deployments/instances/{id}:
     parameters:
       - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+      - $ref: "#/components/parameters/requestIdParam"
       - name: id
         in: path
         required: true
@@ -941,9 +1027,10 @@ paths:
         It will return the current state of the blueprint instance, the same ID provided
         should be used to stream deployment events as they occur.
 
-        If the instance has resources in a drifted or interrupted state, the operation
-        will be blocked with a 409 Conflict response. Use the reconciliation endpoints
-        to resolve drift before retrying.
+        If drift or interrupted state was detected when the change set was created
+        (the change set has the `DRIFT_DETECTED` status), the operation will be blocked
+        with a 409 Conflict response unless `force` is set to true. Use the
+        reconciliation endpoints to resolve drift before staging a new change set.
       operationId: updateBlueprintInstance
       requestBody:
         $ref: "#/components/requestBodies/UpdateBlueprintInstanceBody"
@@ -955,13 +1042,39 @@ paths:
               schema:
                 $ref: "#/components/schemas/BlueprintInstanceResponse"
         "400":
-          description: Bad request
+          description: |
+            Bad request. The request body could not be decoded, the blueprint location
+            could not be resolved, or the change set given by `changeSetId` does not exist
+            (`requested change set is missing`).
+
+            A change set created for a destroy operation is rejected with
+            `{"message":"cannot deploy using a destroy changeset","code":"DESTROY_CHANGESET"}`.
+
+            An `instanceName` that differs from the instance's current name is rejected,
+            since the name of an existing instance cannot be changed:
+            `{"message":"the name of an existing blueprint instance cannot be changed","code":"INSTANCE_NAME_IMMUTABLE","instanceName":"<current name>"}`.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/BadRequestError"
+              examples:
+                instanceNameImmutable:
+                  summary: Attempt to rename an existing instance
+                  value:
+                    message: the name of an existing blueprint instance cannot be changed
+                    code: INSTANCE_NAME_IMMUTABLE
+                    instanceName: my-blueprint-instance
+        "404":
+          description: No blueprint instance has the given ID or name.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotFoundError"
         "422":
-          description: Uprocessable entity (input or source blueprint validation failed)
+          description: |
+            Unprocessable entity. Request-field validation or plugin configuration
+            validation failed, or the deployment could not be started because the source
+            blueprint failed to load (reported in `validationDiagnostics`).
           content:
             application/json:
               schema:
@@ -974,7 +1087,8 @@ paths:
                 $ref: "#/components/schemas/UnauthorisedError"
         "409":
           description: |
-            Operation blocked due to drift or interrupted state.
+            Operation blocked because the change set has the `DRIFT_DETECTED` status.
+            Not returned when `force` is true.
             Use the reconciliation endpoints to resolve drift before retrying.
           content:
             application/json:
@@ -1039,6 +1153,7 @@ paths:
       operationId: getBlueprintInstanceExports
       parameters:
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
         - name: id
           in: path
           required: true
@@ -1090,13 +1205,15 @@ paths:
         It will return the current state of the blueprint instance, the same ID provided
         should be used to stream destroy events as they occur.
 
-        If the instance has resources in a drifted or interrupted state, the operation
-        will be blocked with a 409 Conflict response. Use the reconciliation endpoints
-        to resolve drift before retrying, or set `force` to true in the request body
-        to proceed regardless of drift state.
+        If drift or interrupted state was detected when the destroy change set was created
+        (the change set has the `DRIFT_DETECTED` status), the operation will be blocked
+        with a 409 Conflict response. Use the reconciliation endpoints to resolve drift
+        before retrying, or set `force` to true in the request body to proceed regardless
+        of drift state.
       operationId: destroyBlueprintInstance
       parameters:
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
         - name: id
           in: path
           required: true
@@ -1108,17 +1225,41 @@ paths:
         $ref: "#/components/requestBodies/DestroyBlueprintInstanceBody"
       responses:
         "202":
-          description: Blueprint instance destroy process will start soon.
+          description: |
+            Blueprint instance destroy process will start soon.
+            The instance in the response has its `status` set to Destroying (7).
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/BlueprintInstanceResponse"
         "400":
-          description: Bad request
+          description: |
+            Bad request. The request body could not be decoded, or the change set given
+            by `changeSetId` does not exist (`requested change set is missing`).
+
+            A change set that was not created for a destroy operation is rejected with
+            `{"message":"cannot destroy using a deploy changeset","code":"DEPLOY_CHANGESET"}`.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/BadRequestError"
+        "404":
+          description: |
+            No blueprint instance has the given ID or name.
+            The instance is looked up before the request body is read, so this takes
+            precedence over errors in the request body.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotFoundError"
+        "422":
+          description: |
+            Unprocessable entity. Request-field validation or plugin configuration
+            validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnprocessableEntityError"
         "401":
           description: Unauthorized
           content:
@@ -1127,7 +1268,8 @@ paths:
                 $ref: "#/components/schemas/UnauthorisedError"
         "409":
           description: |
-            Operation blocked due to drift or interrupted state.
+            Operation blocked because the change set has the `DRIFT_DETECTED` status.
+            Not returned when `force` is true.
             Use the reconciliation endpoints to resolve drift before retrying,
             or use the `force` option to proceed regardless.
           content:
@@ -1158,11 +1300,16 @@ paths:
         (e.g., manual changes in the cloud provider console). Interrupted state occurs
         when a previous deployment was cancelled before completing.
 
-        This endpoint does not modify any state - it only performs a read-only check
-        to identify what needs reconciliation.
+        The check does not change the status or the persisted state of any resource or link,
+        so it can be run as often as needed. It does record what it finds: the drift
+        checker saves a drift record for each resource or link found to have drifted and
+        clears the record for one found to match its persisted state. The check does not
+        save a reconciliation result; those are only saved when change staging stops with
+        a `DRIFT_DETECTED` status.
       operationId: checkReconciliation
       parameters:
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
         - name: id
           in: path
           required: true
@@ -1198,7 +1345,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/NotFoundError"
         "422":
-          description: Unprocessable entity (input validation failed)
+          description: |
+            Unprocessable entity. Either request-field validation failed, including a `scope`
+            other than `all`, `interrupted` or `specific`, or plugin configuration validation
+            failed, in which case the body takes the form
+            `{"message":"plugin configuration validation failed","validationDiagnostics":[...]}`.
           content:
             application/json:
               schema:
@@ -1232,6 +1383,7 @@ paths:
       operationId: applyReconciliation
       parameters:
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
         - name: id
           in: path
           required: true
@@ -1267,7 +1419,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/NotFoundError"
         "422":
-          description: Unprocessable entity (input validation failed)
+          description: |
+            Unprocessable entity. Either request-field validation failed, including an action
+            with a missing ID, an unknown `action` or a `newStatus` that is neither a status
+            label nor its integer, or plugin configuration validation failed, in which case
+            the body takes the form
+            `{"message":"plugin configuration validation failed","validationDiagnostics":[...]}`.
           content:
             application/json:
               schema:
@@ -1301,10 +1458,11 @@ paths:
       operationId: streamDeploymentEvents
       parameters:
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
         - name: id
           in: path
           required: true
-          description: The ID of the blueprint instance.
+          description: The ID or unique name of the blueprint instance.
           schema:
             type: string
             example: 16ef8989-af00-4a4a-8164-72493ceb1aa0
@@ -1357,13 +1515,20 @@ paths:
                       - error
                   id:
                     type: string
-                    description: The ID of the event.
+                    description: |
+                      The ID of the event.
+                      Not sent for an `error` event that carries a `StreamErrorEvent`.
                     example: 60d7c6c5-3984-42b9-a3c1-ae8a47a9bf55
                   data:
-                    $ref: "#/components/schemas/DeploymentEvent"
+                    oneOf:
+                      - $ref: "#/components/schemas/DeploymentEvent"
+                      - $ref: "#/components/schemas/StreamErrorEvent"
 
         "404":
-          description: Not found
+          description: |
+            No blueprint instance has the given ID or name.
+            The instance is looked up before the stream is opened, so this is also
+            returned for an instance whose destroy has completed.
           content:
             application/json:
               schema:
@@ -1401,6 +1566,7 @@ paths:
       operationId: cleanUpEvents
       parameters:
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
       responses:
         "202":
           description: Events cleanup has been started.
@@ -1408,18 +1574,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CleanupStartedResponse"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/BadRequestError"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorisedError"
+        "409":
+          description: |
+            A cleanup for this category is already in progress, so this request started
+            nothing. Another caller may have started one, or the Deploy Engine may be
+            running one on its own schedule. Across several Deploy Engines sharing a state
+            backend this is best effort, since the only evidence another engine is mid-run
+            is the cleanup operation it recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CleanupInProgressError"
+        "503":
+          description: |
+            The Deploy Engine is shutting down, so the cleanup was not started.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceUnavailableError"
         default:
           description: Unexpected error
           content:
@@ -1443,6 +1621,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/cleanupOperationIdParam"
         - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
       responses:
         "200":
           description: Cleanup operation status retrieved successfully.
@@ -1450,8 +1629,137 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CleanupOperation"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorisedError"
+        "404":
+          description: |
+            Cleanup operation not found. An operation started through another cleanup endpoint
+            is also reported as not found, so that this endpoint only reports on operations
+            of its own category.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotFoundError"
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnexpectedError"
+      security:
+        - oauth_jwt: []
+        - api_key: []
+
+  /audit/records:
+    get:
+      tags:
+        - Audit
+      summary: Query Audit Records
+      description: |
+        Read the audit trail of actions taken through the Deploy Engine, narrowed by the
+        supplied filters.
+
+        Records come back oldest first, ordered by timestamp and then by ID. That ordering is
+        what makes extraction resumable: ship a page, then ask again with the `nextCursor`
+        the response gives you, until `hasMore` is `false`. Resuming on the timestamp alone
+        would not do, since several records can share one and `limit` is applied after
+        ordering, so a second holding more records than the limit would never be read past.
+
+        Only actions that can change something are recorded. Reads, including the ones in this
+        section, are not part of the trail.
+      operationId: queryAuditRecords
+      parameters:
+        - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
+        - name: from
+          in: query
+          required: false
+          description: |
+            Only return records at or after this Unix timestamp (seconds). Inclusive.
+          schema:
+            type: integer
+            format: int64
+          example: 1678901234
+        - name: to
+          in: query
+          required: false
+          description: |
+            Only return records before this Unix timestamp (seconds). Exclusive.
+          schema:
+            type: integer
+            format: int64
+          example: 1678987634
+        - name: afterTimestamp
+          in: query
+          required: false
+          description: |
+            Resume the listing immediately after the record identified by `afterTimestamp` and
+            `afterId`. Records at the same timestamp with a greater ID are included; records at
+            a greater timestamp always are. Omitting this starts the listing at `from`.
+          schema:
+            type: integer
+            format: int64
+          example: 1678901234
+        - name: afterId
+          in: query
+          required: false
+          description: |
+            The ID half of the resume cursor. Only meaningful alongside `afterTimestamp`, since
+            a timestamp alone does not identify a record.
+          schema:
+            type: string
+            format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        - name: action
+          in: query
+          required: false
+          description: Only return records for this action name.
+          schema:
+            type: string
+          example: instance.destroy
+        - name: principalSubject
+          in: query
+          required: false
+          description: Only return records for the actions of this principal.
+          schema:
+            type: string
+          example: "sha256:9f86d081884c7d65"
+        - name: outcome
+          in: query
+          required: false
+          description: Only return records with this outcome.
+          schema:
+            $ref: "#/components/schemas/AuditRecordOutcome"
+        - name: limit
+          in: query
+          required: false
+          description: |
+            The maximum number of records to return. Defaults to 100 when omitted and must not
+            exceed 1000, so that a single request cannot ask the engine to materialise an
+            entire trail.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+          example: 100
+      responses:
+        "200":
+          description: Audit records retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueryAuditRecordsResponse"
         "400":
-          description: Bad request
+          description: |
+            Bad request. A filter could not be read: `from`, `to` or `afterTimestamp` is not a
+            unix timestamp in seconds, `limit` is not a positive integer up to 1000, or
+            `outcome` is not `success` or `failure`. A filter is rejected rather than ignored,
+            so that a result is never read as covering more than it does.
           content:
             application/json:
               schema:
@@ -1462,8 +1770,262 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorisedError"
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnexpectedError"
+      security:
+        - oauth_jwt: []
+        - api_key: []
+
+  /audit/records/cleanup:
+    post:
+      tags:
+        - Audit
+      summary: Clean up Audit Records
+      description: |
+        Clean up audit records that are older than the retention period configured for the
+        Deploy Engine instance.
+
+        The default retention period for audit records is considerably longer than for the
+        other categories of state, because an audit trail is of interest precisely when
+        something is being looked into after the fact.
+
+        Removing records from the trail is itself an action taken through the engine, so it is
+        recorded in the trail like any other.
+      operationId: cleanUpAuditRecords
+      parameters:
+        - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
+      responses:
+        "202":
+          description: Audit records cleanup has been started.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CleanupStartedResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorisedError"
+        "409":
+          description: |
+            A cleanup for this category is already in progress, so this request started
+            nothing. Another caller may have started one, or the Deploy Engine may be
+            running one on its own schedule. Across several Deploy Engines sharing a state
+            backend this is best effort, since the only evidence another engine is mid-run
+            is the cleanup operation it recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CleanupInProgressError"
+        "503":
+          description: |
+            The Deploy Engine is shutting down, so the cleanup was not started.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceUnavailableError"
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnexpectedError"
+      security:
+        - oauth_jwt: []
+        - api_key: []
+
+  /audit/records/cleanup/{id}:
+    get:
+      tags:
+        - Audit
+      summary: Get Audit Records Cleanup Status
+      description: |
+        Get the status of an audit records cleanup operation.
+        Use this endpoint to poll for the completion of a cleanup operation
+        that was started using the `cleanUpAuditRecords` endpoint.
+      operationId: getAuditRecordsCleanupStatus
+      parameters:
+        - $ref: "#/components/parameters/cleanupOperationIdParam"
+        - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
+      responses:
+        "200":
+          description: Cleanup operation status retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CleanupOperation"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorisedError"
         "404":
-          description: Cleanup operation not found
+          description: |
+            Cleanup operation not found. An operation started through another cleanup endpoint
+            is also reported as not found, so that this endpoint only reports on operations
+            of its own category.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotFoundError"
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnexpectedError"
+      security:
+        - oauth_jwt: []
+        - api_key: []
+
+  /audit/records/{id}:
+    get:
+      tags:
+        - Audit
+      summary: Get an Audit Record
+      description: Retrieve a single audit record by its ID.
+      operationId: getAuditRecord
+      parameters:
+        - $ref: "#/components/parameters/auditRecordIdParam"
+        - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
+      responses:
+        "200":
+          description: Audit record retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditRecord"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorisedError"
+        "404":
+          description: Audit record not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotFoundError"
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnexpectedError"
+      security:
+        - oauth_jwt: []
+        - api_key: []
+
+  /state/housekeeping:
+    post:
+      tags:
+        - State
+      summary: Run State Housekeeping
+      description: |
+        Start the upkeep the state backend needs on its own storage, beyond the
+        retention periods applied by the other cleanup endpoints. What housekeeping
+        involves is up to the storage engine the Deploy Engine is configured with.
+        For example, the `objectstore` storage engine writes a change to a blueprint
+        instance as several objects, so a write that is interrupted part of the way
+        through can leave objects behind that nothing else would delete, and its
+        housekeeping reclaims that storage.
+
+        Housekeeping never changes what the Deploy Engine reads back, and leaves alone
+        anything recent enough to belong to a write still in progress, so it is safe
+        to run at any time, including while other Deploy Engines share the same
+        state backend.
+
+        With a storage engine that needs no housekeeping, such as `memfile` or
+        `postgres`, the operation completes with `itemsDeleted` set to `0`, so callers
+        do not need to know which storage engine is in use. The Deploy Engine also runs
+        housekeeping on its scheduled cleanup interval for storage engines that need it.
+      operationId: runStateHousekeeping
+      parameters:
+        - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
+      responses:
+        "202":
+          description: State housekeeping has been started.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CleanupStartedResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorisedError"
+        "409":
+          description: |
+            A cleanup for this category is already in progress, so this request started
+            nothing. Another caller may have started one, or the Deploy Engine may be
+            running one on its own schedule. Across several Deploy Engines sharing a state
+            backend this is best effort, since the only evidence another engine is mid-run
+            is the cleanup operation it recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CleanupInProgressError"
+        "503":
+          description: |
+            The Deploy Engine is shutting down, so the cleanup was not started.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceUnavailableError"
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnexpectedError"
+      security:
+        - oauth_jwt: []
+        - api_key: []
+
+  /state/housekeeping/{id}:
+    get:
+      tags:
+        - State
+      summary: Get State Housekeeping Status
+      description: |
+        Get the status of a state housekeeping operation.
+        Use this endpoint to poll for the completion of a housekeeping operation
+        that was started using the `runStateHousekeeping` endpoint.
+      operationId: getStateHousekeepingStatus
+      parameters:
+        - $ref: "#/components/parameters/cleanupOperationIdParam"
+        - $ref: "#/components/parameters/bluelinkSignatureV1Param"
+        - $ref: "#/components/parameters/requestIdParam"
+      responses:
+        "200":
+          description: Cleanup operation status retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CleanupOperation"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorisedError"
+        "404":
+          description: |
+            Cleanup operation not found. An operation started through another cleanup endpoint
+            is also reported as not found, so that this endpoint only reports on operations
+            of its own category.
           content:
             application/json:
               schema:
@@ -1490,11 +2052,30 @@ components:
       required: false
       schema:
         type: string
+    requestIdParam:
+      name: X-Request-Id
+      in: header
+      description: |
+        An optional correlation ID for the request, recorded in the Deploy Engine's logs and,
+        for requests that can change something, in the audit trail.
+        When omitted, the Deploy Engine generates one.
+      required: false
+      schema:
+        type: string
+      example: "7c9e6679-7425-40de-944b-e07fc1f90ae7"
     cleanupOperationIdParam:
       name: id
       in: path
       required: true
       description: The unique identifier of the cleanup operation
+      schema:
+        type: string
+        format: uuid
+    auditRecordIdParam:
+      name: id
+      in: path
+      required: true
+      description: The unique identifier of the audit record
       schema:
         type: string
         format: uuid
@@ -1647,12 +2228,18 @@ components:
           example: 1678901234
         range:
           $ref: "#/components/schemas/DiagnosticRange"
+        context:
+          $ref: "#/components/schemas/DiagnosticContext"
         end:
           type: boolean
           description: |
             Indicates whether or not the diagnostic event is the last event in the stream.
             This will be true if the event is the last event in the stream.
             This will be false if the event is not the last event in the stream.
+
+            When a validation produces no diagnostics, a single end marker is sent
+            with `end` set to `true`, an empty `message` and a `level` of `0`.
+            Clients should treat this as the end of the stream rather than as a diagnostic.
           example: false
 
     ChangeStagingEvent:
@@ -1843,6 +2430,7 @@ components:
       type: object
       required:
         - message
+        - diagnostics
         - timestamp
       properties:
         message:
@@ -1852,14 +2440,34 @@ components:
         diagnostics:
           type: array
           description: |
-            A list of diagnostics extracted from an error during change staging or deployment,
-            this will be present if there are validation errors when loading the blueprint document.
+            A list of diagnostics extracted from an error during change staging or deployment.
+            For validation errors when loading the blueprint document this holds one diagnostic
+            per validation error. For any other error it holds a single error-level diagnostic
+            carrying the error message.
+            Always present, but `null` when a load error carries no diagnostics that could be
+            extracted.
           items:
             $ref: "#/components/schemas/Diagnostic"
+          nullable: true
         timestamp:
           type: integer
           description: The unix timestamp of the event in seconds.
           example: 1678901234
+
+    StreamErrorEvent:
+      type: object
+      description: |
+        Sent as an `error` event when the Deploy Engine fails to read events for the stream,
+        after which the stream is closed.
+        Unlike the error events emitted by a change staging or deployment process,
+        this carries only the error message.
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: The error message.
+          example: failed to read events for the stream
 
     DeploymentEvent:
       oneOf:
@@ -1998,6 +2606,46 @@ components:
             spec.policies:
               - archiveFunction::appQueue
               - saveOrderFunction::ordersTable
+        contributionLayerDepth:
+          type: integer
+          description: |
+            Which layer of an ordered set of link contributions this update carries,
+            on events that carry link contributions.
+
+            A resource is ordinarily updated once, at depth 0. A resource that a link
+            contributes a capability to, which other contributing links require, is
+            updated once per layer: the capability first, then the contributions of the
+            links that needed it established. This says why the same resource is reported
+            as updated more than once.
+
+            This will be omitted when 0.
+          example: 1
+        unappliedLinkContributions:
+          type: array
+          description: |
+            The individual contributions that could not be applied, for an update carrying
+            link contributions that failed in a way that can be attributed to particular
+            fields. `failureReasons` carries the same failure as text.
+            This will be omitted when there are none.
+          items:
+            type: object
+            required:
+              - linkName
+              - fieldPath
+              - reason
+            properties:
+              linkName:
+                type: string
+                description: The logical name of the link that owns the field.
+                example: appVpc::statsFunction
+              fieldPath:
+                type: string
+                description: The path in the resource spec the link owns.
+                example: spec.policies[0].policyDocument.statement[0]
+              reason:
+                type: string
+                description: Why the contribution could not be composed.
+                example: the value to inject does not match the selector that would locate it
         failureReasons:
           type: array
           description: |
@@ -2285,6 +2933,9 @@ components:
               17,
               18,
               19,
+              20,
+              21,
+              22,
             ]
         updateTimestamp:
           type: integer
@@ -2298,7 +2949,7 @@ components:
         - status
         - finishTimestamp
         - updateTimestamp
-        - durations
+        - endOfStream
       properties:
         instanceId:
           type: string
@@ -2332,6 +2983,9 @@ components:
               17,
               18,
               19,
+              20,
+              21,
+              22,
             ]
         failureReasons:
           type: array
@@ -2368,9 +3022,60 @@ components:
             - Update Failed (15)
             - Update Rollback Failed (17)
             - Update Rollback Complete (18)
+
+            Omitted for other statuses.
           allOf:
             - $ref: "#/components/schemas/BlueprintInstanceCompletionDurations"
-          nullable: true
+        endOfStream:
+          type: boolean
+          description: |
+            Whether this finish event is the last event in the stream.
+            This is `false` when a failed deployment is about to be rolled back
+            automatically (`autoRollback`), in which case the rollback's events follow,
+            ending with another finish event. When `true`, no more events will be sent
+            and the client can close the stream.
+          example: true
+        skippedRollbackItems:
+          type: array
+          description: |
+            Resources and links that an automatic rollback skipped because they were not
+            in a safe state to roll back.
+            Only present on the finish event of an automatic rollback that skipped items.
+          items:
+            type: object
+            required:
+              - name
+              - type
+              - status
+              - reason
+            properties:
+              name:
+                type: string
+                description: The logical name of the resource or link.
+                example: my-resource
+              type:
+                type: string
+                description: Whether the skipped item is a resource or a link.
+                enum:
+                  - resource
+                  - link
+                example: resource
+              childPath:
+                type: string
+                description: |
+                  The path to the child blueprint containing the item.
+                  Omitted for items in the root blueprint.
+                example: childA.childB
+              status:
+                type: string
+                description: |
+                  The high-level status of the item that prevented it from being rolled back,
+                  as an upper-case status label (e.g. `CREATE FAILED`).
+                example: CREATE FAILED
+              reason:
+                type: string
+                description: Why the item was skipped.
+                example: resource creation was not completed successfully
 
     PreRollbackStateEvent:
       type: object
@@ -2424,17 +3129,22 @@ components:
               17,
               18,
               19,
+              20,
+              21,
+              22,
             ]
         resources:
           type: array
           description: Snapshots of all resource states before rollback.
           items:
             $ref: "#/components/schemas/ResourceSnapshot"
+          nullable: true
         links:
           type: array
           description: Snapshots of all link states before rollback.
           items:
             $ref: "#/components/schemas/LinkSnapshot"
+          nullable: true
         children:
           type: array
           description: |
@@ -2442,12 +3152,14 @@ components:
             Each child snapshot recursively includes its own resources, links, and children.
           items:
             $ref: "#/components/schemas/ChildSnapshot"
+          nullable: true
         failureReasons:
           type: array
           description: The reasons for the deployment failure that triggered the rollback.
           items:
             type: string
             example: Resource creation failed for resource "my-resource"
+          nullable: true
         capturedAt:
           type: integer
           description: The unix timestamp in seconds when the state was captured.
@@ -2525,6 +3237,24 @@ components:
             type: string
             example: Invalid configuration for resource spec
           nullable: true
+        specData:
+          type: object
+          description: |
+            The resolved resource spec including computed fields, holding the outputs
+            of the resource from the provider.
+            Omitted when the resource has no spec data.
+          additionalProperties: true
+          example:
+            functionName: my-lambda-function
+            arn: arn:aws:lambda:us-east-1:123456789012:function:my-lambda-function
+        computedFields:
+          type: array
+          description: |
+            Field paths that are computed at deploy time by the provider.
+            Omitted when there are none.
+          items:
+            type: string
+            example: spec.arn
 
     LinkSnapshot:
       type: object
@@ -2614,22 +3344,28 @@ components:
               17,
               18,
               19,
+              20,
+              21,
+              22,
             ]
         resources:
           type: array
           description: Snapshots of resources in this child blueprint.
           items:
             $ref: "#/components/schemas/ResourceSnapshot"
+          nullable: true
         links:
           type: array
           description: Snapshots of links in this child blueprint.
           items:
             $ref: "#/components/schemas/LinkSnapshot"
+          nullable: true
         children:
           type: array
           description: Snapshots of nested child blueprints.
           items:
             $ref: "#/components/schemas/ChildSnapshot"
+          nullable: true
         failureReasons:
           type: array
           description: Reasons for failure if the child blueprint failed.
@@ -2654,6 +3390,59 @@ components:
           example: 1
         range:
           $ref: "#/components/schemas/DiagnosticRange"
+        context:
+          $ref: "#/components/schemas/DiagnosticContext"
+
+    DiagnosticContext:
+      type: object
+      description: |
+        Structured context for a diagnostic that clients can use to group errors
+        and present ways to resolve them.
+      properties:
+        category:
+          type: string
+          description: The category of the error, used to group related errors.
+          enum:
+            - provider
+            - transformer
+            - function
+            - resource_type
+            - variable_type
+            - data_source_type
+            - export
+          example: resource_type
+        reasonCode:
+          type: string
+          description: A reason code for programmatic identification of the error.
+          example: invalid_resource
+        suggestedActions:
+          type: array
+          description: Actions the user can take to resolve the error.
+          items:
+            type: object
+            required:
+              - type
+              - title
+            properties:
+              type:
+                type: string
+                description: The type of action, for programmatic identification.
+                example: install_provider
+              title:
+                type: string
+                description: A short title for the action.
+                example: Install the provider plugin
+              description:
+                type: string
+                description: A longer description of the action.
+              priority:
+                type: integer
+                description: The priority of the action, from 1 (highest) to 5 (lowest).
+                example: 1
+        metadata:
+          type: object
+          description: Additional metadata for the error.
+          additionalProperties: true
 
     DiagnosticRange:
       type: object
@@ -2690,6 +3479,16 @@ components:
           allOf:
             - $ref: "#/components/schemas/SourcePosition"
           nullable: true
+        columnAccuracy:
+          type: integer
+          description: |
+            How accurate the column number is.
+            `1` means exact and `2` means approximate, as for YAML block literals
+            where the column cannot be precisely determined.
+          example: 1
+          enum:
+            - 1
+            - 2
 
     SourcePosition:
       type: object
@@ -2808,6 +3607,8 @@ components:
             This name must be unique across all blueprint instances in the system
             and can be used as an alternative to the instance ID when referencing
             the blueprint instance in other API calls.
+
+            A name that already belongs to an instance is rejected with a `409`.
           example: my-blueprint-instance
         changeSetId:
           type: string
@@ -2906,6 +3707,15 @@ components:
         - changeSetId
         - directory
       properties:
+        instanceName:
+          type: string
+          description: |
+            The name of the blueprint instance being updated.
+            Optional: when omitted or empty, the instance keeps its name.
+            The name of an existing instance cannot be changed, so a value that differs
+            from the instance's current name is rejected with a 400 response carrying the
+            `INSTANCE_NAME_IMMUTABLE` code.
+          example: my-blueprint-instance
         changeSetId:
           type: string
           description: |
@@ -2988,6 +3798,9 @@ components:
             Force the update to proceed, ignoring state conflicts.
             This is an escape hatch for recovering from stuck states where the blueprint instance is in an inconsistent state
             (e.g., stuck in "Updating" or "Preparing" status due to a crash or unexpected termination).
+
+            This also bypasses the 409 Conflict response for a change set with the
+            `DRIFT_DETECTED` status, deploying the change set regardless of the drift.
 
             Use this flag with care. Only use this when you are certain the instance is in a stuck state
             and no other deployment process is running.
@@ -3076,6 +3889,8 @@ components:
             - `all`: Check all resources and links in the instance (default)
             - `interrupted`: Only check elements currently in an interrupted state
             - `specific`: Check only the named resources and/or links
+
+            Any other value is rejected with a `422`.
           example: all
           default: all
           enum:
@@ -3108,8 +3923,8 @@ components:
         childPath:
           type: string
           description: |
-            Limits the scope to resources/links within a specific child blueprint path.
-            Used when scope is `specific`.
+            Limits the check to resources and links within a specific child blueprint path.
+            This applies to every scope, not only `specific`.
             Format: `childA` for first level, `childA.childB` for nested.
           example: "childA.childB"
         config:
@@ -3190,12 +4005,54 @@ components:
         externalState:
           type: object
           description: |
-            Required when action is `accept_external`.
-            The external state that will be persisted.
+            The external state that will be persisted, needed when action is `accept_external`.
+            A missing value with `accept_external` does not reject the request. The action
+            fails for this resource alone and is reported in the `errors` of the result,
+            while the other actions in the request are still applied.
         newStatus:
-          type: string
-          description: The precise resource status to set.
+          description: |
+            The precise status to set for the resource, either as its upper-case status label
+            with words separated by spaces (e.g. `CREATED`, `UPDATE FAILED`), matched in any case, or as the
+            integer used for precise statuses elsewhere in this API, given as a string
+            (e.g. `"3"`). The `newStatus` of a reconciliation check result can be passed back
+            as it is.
+            Any other value is rejected with a `422`.
           example: CREATED
+          anyOf:
+            - type: string
+              enum:
+                - UNKNOWN
+                - CREATING
+                - CONFIG COMPLETE
+                - CREATED
+                - CREATE FAILED
+                - CREATE ROLLING BACK
+                - CREATE ROLLBACK FAILED
+                - CREATE ROLLBACK COMPLETE
+                - DESTROYING
+                - DESTROYED
+                - DESTROY FAILED
+                - DESTROY ROLLING BACK
+                - DESTROY ROLLBACK FAILED
+                - DESTROY ROLLBACK CONFIG COMPLETE
+                - DESTROY ROLLBACK COMPLETE
+                - UPDATING
+                - UPDATE CONFIG COMPLETE
+                - UPDATED
+                - UPDATE FAILED
+                - UPDATE ROLLING BACK
+                - UPDATE ROLLBACK FAILED
+                - UPDATE ROLLBACK CONFIG COMPLETE
+                - UPDATE ROLLBACK COMPLETE
+                - CREATE INTERRUPTED
+                - UPDATE INTERRUPTED
+                - DESTROY INTERRUPTED
+                - RETAINED
+                - UPDATING LINK CONTRIBUTIONS
+                - LINK CONTRIBUTIONS UPDATED
+                - LINK CONTRIBUTIONS UPDATE FAILED
+            - type: string
+              pattern: "^[0-9]+$"
 
     LinkReconcileActionPayload:
       type: object
@@ -3228,9 +4085,34 @@ components:
             - update_status
             - manual_cleanup_required
         newStatus:
-          type: string
-          description: The precise link status to set.
-          example: RESOURCE_B_UPDATED
+          description: |
+            The precise status to set for the link, either as its upper-case status label
+            with words separated by spaces (e.g. `LINKED RESOURCES UPDATED`), matched in any case, or as the
+            integer used for precise statuses elsewhere in this API, given as a string
+            (e.g. `"3"`). The `newStatus` of a reconciliation check result can be passed back
+            as it is.
+            Any other value is rejected with a `422`.
+          example: LINKED RESOURCES UPDATED
+          anyOf:
+            - type: string
+              enum:
+                - UNKNOWN
+                - UPDATING LINKED RESOURCES
+                - LINKED RESOURCES UPDATED
+                - LINKED RESOURCES UPDATE FAILED
+                - LINKED RESOURCES UPDATE ROLLING BACK
+                - LINKED RESOURCES UPDATE ROLLBACK FAILED
+                - LINKED RESOURCES UPDATE ROLLBACK COMPLETE
+                - UPDATING INTERMEDIARY RESOURCES
+                - INTERMEDIARY RESOURCES UPDATED
+                - INTERMEDIARY RESOURCES UPDATE FAILED
+                - INTERMEDIARY RESOURCES UPDATE ROLLING BACK
+                - INTERMEDIARY RESOURCES UPDATE ROLLBACK FAILED
+                - INTERMEDIARY RESOURCES UPDATE ROLLBACK COMPLETE
+                - LINKED RESOURCES UPDATE INTERRUPTED
+                - INTERMEDIARY RESOURCES UPDATE INTERRUPTED
+            - type: string
+              pattern: "^[0-9]+$"
         linkDataUpdates:
           type: object
           description: |
@@ -3259,14 +4141,63 @@ components:
         externalState:
           type: object
           description: |
-            Required when action is `accept_external`.
-            The external state that will be persisted.
+            The external state to persist for the intermediary resource when action is
+            `accept_external`. Optional: when it is omitted, only the status is updated
+            and the persisted state is left as it is.
         newStatus:
-          type: string
-          description: The precise resource status to set.
+          description: |
+            The precise status to set for the intermediary resource, either as its upper-case status label
+            with words separated by spaces (e.g. `CREATED`, `UPDATE FAILED`), matched in any case, or as the
+            integer used for precise statuses elsewhere in this API, given as a string
+            (e.g. `"3"`). The `newStatus` of a reconciliation check result can be passed back
+            as it is.
+            Any other value is rejected with a `422`.
+          example: CREATED
+          anyOf:
+            - type: string
+              enum:
+                - UNKNOWN
+                - CREATING
+                - CONFIG COMPLETE
+                - CREATED
+                - CREATE FAILED
+                - CREATE ROLLING BACK
+                - CREATE ROLLBACK FAILED
+                - CREATE ROLLBACK COMPLETE
+                - DESTROYING
+                - DESTROYED
+                - DESTROY FAILED
+                - DESTROY ROLLING BACK
+                - DESTROY ROLLBACK FAILED
+                - DESTROY ROLLBACK CONFIG COMPLETE
+                - DESTROY ROLLBACK COMPLETE
+                - UPDATING
+                - UPDATE CONFIG COMPLETE
+                - UPDATED
+                - UPDATE FAILED
+                - UPDATE ROLLING BACK
+                - UPDATE ROLLBACK FAILED
+                - UPDATE ROLLBACK CONFIG COMPLETE
+                - UPDATE ROLLBACK COMPLETE
+                - CREATE INTERRUPTED
+                - UPDATE INTERRUPTED
+                - DESTROY INTERRUPTED
+                - RETAINED
+                - UPDATING LINK CONTRIBUTIONS
+                - LINK CONTRIBUTIONS UPDATED
+                - LINK CONTRIBUTIONS UPDATE FAILED
+            - type: string
+              pattern: "^[0-9]+$"
 
     ReconciliationCheckResult:
       type: object
+      required:
+        - instanceId
+        - resources
+        - links
+        - hasInterrupted
+        - hasDrift
+        - hasChildIssues
       properties:
         instanceId:
           type: string
@@ -3297,6 +4228,15 @@ components:
 
     ResourceReconcileResult:
       type: object
+      required:
+        - resourceId
+        - resourceName
+        - resourceType
+        - type
+        - oldStatus
+        - newStatus
+        - resourceExists
+        - recommendedAction
       properties:
         resourceId:
           type: string
@@ -3338,12 +4278,14 @@ components:
           example: 3
         externalState:
           type: object
-          description: The current cloud state if the resource exists. Null if resource doesn't exist.
-          nullable: true
+          description: |
+            The current cloud state if the resource exists.
+            Omitted if the resource doesn't exist or its external state could not be fetched.
         persistedState:
           type: object
-          description: What we have in our state store.
-          nullable: true
+          description: |
+            What we have in our state store.
+            Omitted when there is no persisted state for the resource.
         changes:
           $ref: "#/components/schemas/FieldChanges"
         resourceExists:
@@ -3369,8 +4311,13 @@ components:
             the live resource holds, so a difference may be reported that was not
             caused by a change to the resource. These say which part of the picture
             could not be assembled.
+            Omitted when there are none.
           items:
             type: object
+            required:
+              - linkName
+              - fieldPath
+              - reason
             properties:
               linkName:
                 type: string
@@ -3387,6 +4334,13 @@ components:
 
     LinkReconcileResult:
       type: object
+      required:
+        - linkId
+        - linkName
+        - type
+        - oldStatus
+        - newStatus
+        - recommendedAction
       properties:
         linkId:
           type: string
@@ -3443,6 +4397,10 @@ components:
 
     IntermediaryReconcileResult:
       type: object
+      required:
+        - name
+        - type
+        - exists
       properties:
         name:
           type: string
@@ -3454,12 +4412,14 @@ components:
           example: aws/securityGroup
         externalState:
           type: object
-          description: The current cloud state if the resource exists.
-          nullable: true
+          description: |
+            The current cloud state if the resource exists.
+            Omitted if the resource doesn't exist or its external state could not be fetched.
         persistedState:
           type: object
-          description: What we have in our state store.
-          nullable: true
+          description: |
+            What we have in our state store.
+            Omitted when there is no persisted state for the intermediary resource.
         changes:
           $ref: "#/components/schemas/FieldChanges"
         exists:
@@ -3512,27 +4472,39 @@ components:
 
     DriftBlockedResponse:
       type: object
-      description: Response when an operation is blocked due to drift or interrupted state.
+      description: |
+        Response when a deployment or destroy is blocked because the change set it uses
+        has the `DRIFT_DETECTED` status.
+      required:
+        - message
+        - instanceId
+        - hint
       properties:
         message:
           type: string
           description: A message describing why the operation was blocked.
-          example: Operation blocked due to drift detected in deployed resources.
+          example: Operation blocked due to drift detection. Reconciliation is required before proceeding.
         instanceId:
           type: string
           description: The ID of the blueprint instance.
           example: 60d7c6c5-3984-42b9-a3c1-ae8a47a9bf55
         changesetId:
           type: string
-          description: The ID of the changeset if applicable.
-          nullable: true
+          description: |
+            The ID of the change set that detected the drift.
+            Omitted when empty.
           example: a471bbb8-1267-4e65-873b-fa86bca71fcf
         reconciliationResult:
-          $ref: "#/components/schemas/ReconciliationCheckResult"
+          description: |
+            The drift and interrupted state detected when the change set was staged.
+            Omitted when no reconciliation result could be found for the change set,
+            for example once it has been removed by the reconciliation results cleanup.
+          allOf:
+            - $ref: "#/components/schemas/ReconciliationCheckResult"
         hint:
           type: string
           description: Suggested next steps to resolve the blocked state.
-          example: Use the reconciliation endpoints to resolve drift before retrying.
+          example: Use the reconciliation endpoints to review and resolve drift, or set force=true to bypass this check.
 
     ChangeSet:
       type: object
@@ -3551,9 +4523,9 @@ components:
           type: string
           description: |
             The ID of the blueprint instance that the change set is for.
-            This is only present for change sets that are created for existing blueprint instances.
+            This is only present for change sets that are created for existing blueprint instances,
+            and is omitted otherwise.
           example: 60d7c6c5-3984-42b9-a3c1-ae8a47a9bf55
-          nullable: true
         destroy:
           type: boolean
           description: |
@@ -3586,8 +4558,13 @@ components:
         changes:
           description: |
             The changes that will be applied to the blueprint instance.
-            This will be empty until the change staging process has completed.
-          $ref: "#/components/schemas/ChangeSetChanges"
+
+            Only a change set with the `CHANGES_STAGED` status holds the staged changes.
+            The `202` response from creating a change set, and a change set with any other
+            status, carries an empty changes value: every array and map in it is `null`
+            and `metadataChanges` holds only `null` fields.
+          allOf:
+            - $ref: "#/components/schemas/ChangeSetChanges"
         created:
           type: integer
           description: The unix timestamp of when the change set was created in seconds.
@@ -3631,16 +4608,28 @@ components:
         - metadataChanges
         - resolveOnDeploy
       properties:
+        diagnostics:
+          type: array
+          description: |
+            Warnings and informational messages raised while the blueprint was loaded
+            and transformed, carried with the change set so that they can be reported
+            alongside what will be deployed.
+            Errors are never carried here, an error diagnostic fails the load instead.
+            Omitted when there are none.
+          items:
+            $ref: "#/components/schemas/Diagnostic"
         newResources:
           type: object
           description: The resources that will be created when deploying the changes.
           additionalProperties:
             $ref: "#/components/schemas/ResourceChanges"
+          nullable: true
         resourceChanges:
           type: object
           description: The changes that will be made to existing resources when deploying the changes.
           additionalProperties:
             $ref: "#/components/schemas/ResourceChanges"
+          nullable: true
         removedResources:
           type: array
           description: |
@@ -3651,6 +4640,7 @@ components:
             type: string
             description: The name of the resource that will be removed.
             example: my-old-resource
+          nullable: true
         retainedResources:
           type: array
           description: |
@@ -3661,6 +4651,7 @@ components:
             type: string
             description: The name of the resource that will be retained.
             example: my-retained-resource
+          nullable: true
         removedLinks:
           type: array
           description: |
@@ -3670,16 +4661,19 @@ components:
             type: string
             description: The name of the link that will be removed.
             example: my-old-link
+          nullable: true
         newChildren:
           type: object
           description: The child blueprints that will be created when deploying the changes.
           additionalProperties:
             $ref: "#/components/schemas/NewBlueprintDefinition"
+          nullable: true
         childChanges:
           type: object
           description: The changes that will be made to existing child blueprints when deploying the changes.
           additionalProperties:
             $ref: "#/components/schemas/ChangeSetChanges"
+          nullable: true
         recreateChildren:
           type: array
           description: The names of child blueprints that will be recreated when deploying the changes.
@@ -3687,6 +4681,7 @@ components:
             type: string
             description: The name of the child blueprint that will be recreated.
             example: another-child-blueprint
+          nullable: true
         removedChildren:
           type: array
           description: The names of child blueprints that will be removed when deploying the changes.
@@ -3694,16 +4689,19 @@ components:
             type: string
             description: The name of the child blueprint that will be removed.
             example: old-child-blueprint
+          nullable: true
         newExports:
           type: object
           description: The exports that will be created when deploying the changes.
           additionalProperties:
             $ref: "#/components/schemas/FieldChange"
+          nullable: true
         exportChanges:
           type: object
           description: The changes that will be made to existing exports when deploying the changes.
           additionalProperties:
             $ref: "#/components/schemas/FieldChange"
+          nullable: true
         unchangedExports:
           type: array
           description: The exports that will not be changed when deploying the changes.
@@ -3711,6 +4709,7 @@ components:
             type: string
             description: The name of the export that will not be changed.
             example: my-export
+          nullable: true
         removedExports:
           type: array
           description: The exports that will be removed when deploying the changes.
@@ -3718,6 +4717,7 @@ components:
             type: string
             description: The name of the export that will be removed.
             example: my-old-export
+          nullable: true
         metadataChanges:
           type: object
           description: Changes to the blueprint-wide metadata.
@@ -3735,6 +4735,7 @@ components:
             type: string
             description: The path to the property that contains substitutions that can not be resolved until the blueprint is deployed.
             example: resources["my-resource"].spec.field2
+          nullable: true
       example:
         $ref: "#/components/examples/changeSetChangesExample"
 
@@ -3751,11 +4752,13 @@ components:
           description: The fields that will be added to the blueprint metadata.
           items:
             $ref: "#/components/schemas/FieldChange"
+          nullable: true
         modifiedFields:
           type: array
           description: The fields that will be modified in the blueprint metadata.
           items:
             $ref: "#/components/schemas/FieldChange"
+          nullable: true
         unchangedFields:
           type: array
           description: The fields that will not be changed in the blueprint metadata.
@@ -3763,6 +4766,7 @@ components:
             type: string
             description: The name of the field that will not be changed.
             example: my-field
+          nullable: true
         removedFields:
           type: array
           description: The fields that will be removed from the blueprint metadata.
@@ -3770,28 +4774,84 @@ components:
             type: string
             description: The name of the field that will be removed.
             example: my-old-field
+          nullable: true
 
     FieldChanges:
       type: object
       description: |
         Details of field-level changes between persisted and external state.
         Used in reconciliation results to show what has changed.
+
+        This is serialised from the same type as `ResourceChanges` in a change set, so
+        the other change-staging fields (`appliedResourceInfo`, `computedFields`,
+        `fieldChangesKnownOnDeploy`, `conditionKnownOnDeploy`, `newOutboundLinks`,
+        `outboundLinkChanges` and `removedOutboundLinks`) are also present, holding
+        zero or `null` values. Only the fields described here carry information in a
+        reconciliation result.
       properties:
+        mustRecreate:
+          type: boolean
+          description: |
+            Whether applying the changes would require the resource to be recreated.
+          example: false
         modifiedFields:
           type: array
           description: Fields that have changed between persisted and external state.
           items:
             $ref: "#/components/schemas/FieldChange"
+          nullable: true
         newFields:
           type: array
           description: Fields that exist in external state but not in persisted state.
           items:
             $ref: "#/components/schemas/FieldChange"
+          nullable: true
         removedFields:
           type: array
           description: Field paths that exist in persisted state but not in external state.
           items:
             type: string
+          nullable: true
+        unchangedFields:
+          type: array
+          description: Field paths that are the same in persisted and external state.
+          items:
+            type: string
+          nullable: true
+        linkOwnedFields:
+          type: object
+          description: |
+            A mapping of a resource spec field path to the logical name of the link
+            that contributes the value at that path.
+            Omitted when no link contributes to the resource.
+          additionalProperties:
+            type: string
+            example: ordersFunction::ordersTable
+        unappliedLinkFields:
+          type: array
+          description: |
+            Contributions a link records against the resource that could not be
+            composed into its spec.
+            Omitted when there are none.
+          items:
+            type: object
+            required:
+              - linkName
+              - fieldPath
+              - reason
+            properties:
+              linkName:
+                type: string
+                description: The logical name of the link that owns the field.
+                example: appVpc::statsFunction
+              fieldPath:
+                type: string
+                description: The path in the resource spec the link owns.
+                example: spec.policies[0].policyDocument.statement[0]
+              reason:
+                type: string
+                description: Why the contribution could not be composed.
+                example: the value to inject does not match the selector that would locate it
 
     FieldChange:
       type: object
@@ -3800,6 +4860,7 @@ components:
         - prevValue
         - newValue
         - mustRecreate
+        - sensitive
       properties:
         fieldPath:
           type: string
@@ -3960,19 +5021,20 @@ components:
         outboundLinkChanges:
           type: object
           description: |
-            A mapping of the linked to resource name to any changes
+            A mapping of the linked to resource name (resource B) to any changes
             that will be made to existing links.
           additionalProperties:
             $ref: "#/components/schemas/LinkChanges"
         removedOutboundLinks:
           type: array
           description: |
-            A list of link identifiers that will be removed.
-            The form of the link identifier is `{resourceA}::{resourceB}`.
+            The names of the linked-to resources (resource B) for outbound links that will
+            be removed. The linked-from resource (resource A) is the resource these changes
+            belong to.
           items:
             type: string
-            description: The name of the link that will be removed.
-            example: my-resource-a::my-resource-b
+            description: The name of the linked-to resource of a link that will be removed.
+            example: my-resource-b
 
     LinkChanges:
       type: object
@@ -4016,6 +5078,24 @@ components:
             type: string
             description: The name of the field that will be known when the host blueprint is deployed.
             example: my-field
+        resourceDataMappings:
+          type: object
+          description: |
+            The resource fields the link will contribute to, mapped to the path in the
+            link's data that each field's value will be read from.
+            Keys take the `{resourceName}::{fieldPath}` form used by the
+            `resourceDataMappings` field of the `LinkState` schema. This declares that
+            correspondence ahead of time, without the values, so that a change set can
+            attribute a contribution to a link that is new in this deployment.
+
+            A mapping the link cannot determine from the blueprint alone is left out.
+            Omitted when the link declares none.
+          additionalProperties:
+            type: string
+            description: The path in the link's data that the field's value will be read from.
+            example: ordersFunction.environment.TABLE_NAME
+          example:
+            ordersFunction::spec.environment.variables.TABLE_NAME: ordersFunction.environment.TABLE_NAME
 
     ResourceInfo:
       type: object
@@ -4063,6 +5143,7 @@ components:
           description: |
             A version of the resource defined in the blueprint document for which all
             ${..} substitutions have been resolved.
+          nullable: true
           allOf:
             - $ref: "#/components/schemas/ResolvedResource"
 
@@ -4280,6 +5361,7 @@ components:
             type: string
             description: The reason why the resource deployment has failed.
             example: The resource could not be created because the IAM role does not exist.
+          nullable: true
         removalPolicy:
           type: string
           description: |
@@ -4309,6 +5391,9 @@ components:
             for a resource that no link contributes to.
           items:
             type: object
+            required:
+              - layerDepth
+              - timestamp
             properties:
               layerDepth:
                 type: integer
@@ -4422,6 +5507,12 @@ components:
     ProvenanceState:
       type: object
       description: Bluelink provenance information for a resource.
+      required:
+        - provisionedBy
+        - deployEngineVersion
+        - providerPluginId
+        - providerPluginVersion
+        - provisionedAt
       properties:
         provisionedBy:
           type: string
@@ -4511,6 +5602,25 @@ components:
             functionName: my-lambda-function
             handler: index.handler
             runtime: nodejs20.x
+        sensitiveSpecPaths:
+          type: array
+          description: |
+            The spec field paths that a secret reached while the resource's substitutions
+            were resolved, in the form field changes use (e.g. `spec.connectionString`).
+            A secret reaching one entry marks that entry, not its parent.
+            Omitted when there are none.
+          items:
+            type: string
+            example: spec.connectionString
+        sensitiveMetadataPaths:
+          type: array
+          description: |
+            The metadata field paths that a secret reached while the resource's substitutions
+            were resolved, rooted at `metadata`.
+            Omitted when there are none.
+          items:
+            type: string
+            example: metadata.annotations.apiKey
 
     LinkSelector:
       type: object
@@ -4526,6 +5636,18 @@ components:
             type: string
             description: The label value.
             example: processing
+        exclude:
+          type: array
+          description: |
+            The names of resources to exclude from the link selection, even when their
+            labels match.
+            Omitted when no resources are excluded, though it can be `null` for a resource
+            from a JSON or JSONC source blueprint that excludes none.
+          items:
+            type: string
+            description: The name of a resource to exclude.
+            example: my-other-function
+          nullable: true
 
     ResolvedResourceCondition:
       oneOf:
@@ -4572,6 +5694,15 @@ components:
           type: object
           additionalProperties:
             $ref: "#/components/schemas/FieldChange"
+        resolveOnDeploy:
+          type: array
+          description: |
+            Paths to properties in the new child blueprint that contain substitutions
+            that can not be resolved until the blueprint is deployed.
+            Omitted when there are none.
+          items:
+            type: string
+            example: resources["my-resource"].spec.field2
 
     ListBlueprintInstancesResponse:
       type: object
@@ -4581,9 +5712,12 @@ components:
       properties:
         instances:
           type: array
-          description: The list of blueprint instance summaries for the current page.
+          description: |
+            The list of blueprint instance summaries for the current page.
+            Can be `null` when no instances match.
           items:
             $ref: "#/components/schemas/BlueprintInstanceSummary"
+          nullable: true
         totalCount:
           type: integer
           description: |
@@ -4608,60 +5742,37 @@ components:
           description: The user-defined name of the blueprint instance.
           example: my-app-production
         status:
-          type: string
+          type: integer
           description: |
             The current deployment status of the instance.
-
-            The following status values are supported:
-
-            - `PREPARING` - The instance is being prepared to be deployed, updated or destroyed.
-            - `DEPLOYING` - An initial blueprint deployment is in progress.
-            - `DEPLOYED` - The instance has been deployed successfully.
-            - `DEPLOY FAILED` - The first deployment of the instance failed.
-            - `DEPLOY ROLLING BACK` - The instance deployment has failed and is being rolled back.
-            - `DEPLOY ROLLBACK FAILED` - The instance deployment rollback has failed.
-            - `DEPLOY ROLLBACK COMPLETE` - The instance deployment has been successfully rolled back.
-            - `DESTROYING` - The instance is being destroyed.
-            - `DESTROYED` - The instance has been destroyed.
-            - `DESTROY FAILED` - The destruction of the instance has failed.
-            - `DESTROY ROLLING BACK` - The instance destruction has failed and is being rolled back.
-            - `DESTROY ROLLBACK FAILED` - The instance destruction rollback has failed.
-            - `DESTROY ROLLBACK COMPLETE` - The instance destruction has been successfully rolled back.
-            - `UPDATING` - The instance is being updated.
-            - `UPDATED` - The instance has been successfully updated.
-            - `UPDATE FAILED` - The instance update has failed.
-            - `UPDATE ROLLING BACK` - The instance update has failed and is being rolled back.
-            - `UPDATE ROLLBACK FAILED` - The instance update rollback has failed.
-            - `UPDATE ROLLBACK COMPLETE` - The instance update has been successfully rolled back.
-            - `NOT DEPLOYED` - The instance has not had its first deployment.
-            - `DEPLOY INTERRUPTED` - The instance deployment was interrupted.
-            - `UPDATE INTERRUPTED` - The instance update was interrupted.
-            - `DESTROY INTERRUPTED` - The instance destruction was interrupted.
-          example: DEPLOYED
+            See the `BlueprintInstance` schema definition for what each status means.
+          example: 2
           enum:
-            - PREPARING
-            - DEPLOYING
-            - DEPLOYED
-            - DEPLOY FAILED
-            - DEPLOY ROLLING BACK
-            - DEPLOY ROLLBACK FAILED
-            - DEPLOY ROLLBACK COMPLETE
-            - DESTROYING
-            - DESTROYED
-            - DESTROY FAILED
-            - DESTROY ROLLING BACK
-            - DESTROY ROLLBACK FAILED
-            - DESTROY ROLLBACK COMPLETE
-            - UPDATING
-            - UPDATED
-            - UPDATE FAILED
-            - UPDATE ROLLING BACK
-            - UPDATE ROLLBACK FAILED
-            - UPDATE ROLLBACK COMPLETE
-            - NOT DEPLOYED
-            - DEPLOY INTERRUPTED
-            - UPDATE INTERRUPTED
-            - DESTROY INTERRUPTED
+            [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+            ]
         lastDeployedTimestamp:
           type: integer
           description: |
@@ -4683,6 +5794,7 @@ components:
         - metadata
         - exports
         - childBlueprints
+        - version
       properties:
         id:
           type: string
@@ -4797,7 +5909,8 @@ components:
         childBlueprints:
           type: object
           description: |
-            A mapping of child blueprint instance IDs to the child blueprint instance state.
+            A mapping of child blueprint logical names, as defined in the parent blueprint,
+            to the child blueprint instance state.
             This is used to store information about child blueprints that are created
             as part of the deployment of the parent blueprint instance.
           additionalProperties:
@@ -4815,6 +5928,14 @@ components:
           allOf:
             - $ref: "#/components/schemas/BlueprintInstanceCompletionDurations"
           nullable: true
+        version:
+          type: integer
+          format: int64
+          description: |
+            The version of the instance record, incremented on each status update.
+            Used for optimistic concurrency control between deployment processes that
+            try to start a deployment for the same instance at the same time.
+          example: 3
       example:
         id: a97cf86f-2a5e-4614-984e-da480a0daa7a
         name: my-blueprint-instance
@@ -4887,6 +6008,7 @@ components:
         durations:
           prepareDuration: 10000.0
           totalDuration: 20000.0
+        version: 3
 
     BlueprintInstanceResponse:
       type: object
@@ -4955,6 +6077,15 @@ components:
             This is used to retain information about the source of the export
             from within the blueprint.
           example: resources["my-resource"].spec.arn
+        sensitive:
+          type: boolean
+          description: |
+            True when the exported value holds a secret, either because the field it
+            exports is declared sensitive or because a secret was interpolated into it.
+            The value is still returned as-is; this tells a client to redact it when
+            showing it to a person.
+            Omitted when false.
+          example: false
 
     DependencyInfo:
       type: object
@@ -5110,6 +6241,7 @@ components:
             type: string
             description: The reason why the link deployment has failed.
             example: The link could not be created because the IAM role does not exist.
+          nullable: true
         resourceDataMappings:
           type: object
           description: |
@@ -5121,6 +6253,43 @@ components:
             type: string
           example:
             "orderServiceRole::spec.policy.name": "orderServiceRole.policy"
+        sensitiveDataPaths:
+          type: array
+          description: |
+            The paths within `data` that hold secrets.
+            Omitted when there are none.
+          items:
+            type: string
+            example: ordersFunction.environment.DB_PASSWORD
+        contributionRecords:
+          type: object
+          description: |
+            How each contribution this link makes to a resource field is combined with
+            what is already at that field, and whether it outlives the link.
+            Keyed by the same `{resourceName}::{fieldPath}` form as `resourceDataMappings`.
+            Omitted when the link makes no contributions.
+          additionalProperties:
+            type: object
+            required:
+              - action
+            properties:
+              action:
+                type: integer
+                description: |
+                  How the contribution is applied:
+                  - Set (0) - The value replaces what is at the field path.
+                  - Append (1) - The value is added to the end of the list at the field path.
+                enum: [0, 1]
+                example: 1
+              retainOnRemoval:
+                type: boolean
+                description: |
+                  Keeps the contribution on the resource after the link that made it has
+                  been removed. Otherwise a contribution is retracted along with its link.
+                  Omitted when false.
+                example: false
+          example:
+            "ordersRole::spec.policies": { "action": 1 }
         drifted:
           type: boolean
           description: |
@@ -5145,6 +6314,7 @@ components:
       type: object
       required:
         - id
+        - type
         - instanceId
         - status
         - preciseStatus
@@ -5171,7 +6341,7 @@ components:
 
             See the status codes for the `ResourceState` schema definition for what each status means.
           example: 2
-          enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+          enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
         preciseStatus:
           type: integer
           description: |
@@ -5204,6 +6374,10 @@ components:
               20,
               21,
               22,
+              23,
+              24,
+              25,
+              26,
             ]
         lastDeployedTimestamp:
           type: integer
@@ -5287,7 +6461,7 @@ components:
       properties:
         message:
           type: string
-          example: An unexpected error occurred
+          example: an unexpected error occurred
       required:
         - message
 
@@ -5306,8 +6480,46 @@ components:
         message:
           type: string
           example: Bad request
+        code:
+          type: string
+          description: |
+            A code identifying the error, present on errors a client may need to tell apart:
+            - `DESTROY_CHANGESET`: A destroy change set was used to deploy a blueprint instance.
+            - `DEPLOY_CHANGESET`: A change set that was not created for a destroy operation was used to destroy a blueprint instance.
+            - `INSTANCE_NAME_IMMUTABLE`: An update requested a different name for an existing blueprint instance.
+          enum:
+            - DESTROY_CHANGESET
+            - DEPLOY_CHANGESET
+            - INSTANCE_NAME_IMMUTABLE
+          example: INSTANCE_NAME_IMMUTABLE
+        instanceName:
+          type: string
+          description: |
+            The current name of the blueprint instance.
+            Only present with the `INSTANCE_NAME_IMMUTABLE` code.
+          example: my-blueprint-instance
       required:
         - message
+
+    InstanceAlreadyExistsError:
+      type: object
+      properties:
+        message:
+          type: string
+          example: a blueprint instance named "my-blueprint-instance" already exists
+        code:
+          type: string
+          enum:
+            - INSTANCE_ALREADY_EXISTS
+        instanceId:
+          type: string
+          description: |
+            The ID of the blueprint instance that already has the requested name.
+            Omitted when that instance was removed before it could be looked up.
+          example: 16ef8989-af00-4a4a-8164-72493ceb1aa0
+      required:
+        - message
+        - code
 
     UnprocessableEntityError:
       type: object
@@ -5316,7 +6528,7 @@ components:
       properties:
         message:
           type: string
-          example: Input validation failed
+          example: request body input validation failed
         errors:
           type: array
           description: |
@@ -5331,12 +6543,14 @@ components:
             properties:
               location:
                 type: string
-                description: The location of the error in the request.
-                example: body
+                description: |
+                  The location of the error in the request body,
+                  as a path of JSON field names prefixed with `.`.
+                example: .fileSourceScheme
               message:
                 type: string
                 description: A message describing the error.
-                example: "Value must be one of the following: [aws, azure]"
+                example: "the value must be one of the following: file s3 gcs azureblob https"
               type:
                 type: string
                 description: The type of error.
@@ -5356,6 +6570,30 @@ components:
         message:
           type: string
           example: Not found
+      required:
+        - message
+
+    CleanupInProgressError:
+      type: object
+      description: |
+        A cleanup for the same category is already running, so this request started
+        nothing. The cleanup that is already running will apply the same retention period,
+        so there is nothing for the caller to do.
+      properties:
+        message:
+          type: string
+          example: a cleanup for this category is already in progress
+      required:
+        - message
+
+    ServiceUnavailableError:
+      type: object
+      description: |
+        The Deploy Engine is shutting down, so the request started nothing.
+      properties:
+        message:
+          type: string
+          example: the engine is shutting down, so no cleanup was started
       required:
         - message
 
@@ -5382,6 +6620,7 @@ components:
         - cleanupType
         - status
         - startedAt
+        - itemsDeleted
         - thresholdDate
       properties:
         id:
@@ -5403,7 +6642,7 @@ components:
           format: int64
           description: |
             Unix timestamp (seconds) when the operation ended.
-            Will be 0 if the operation is still running.
+            Omitted while the operation is still running.
           example: 1678901334
         itemsDeleted:
           type: integer
@@ -5420,7 +6659,8 @@ components:
           description: |
             Unix timestamp (seconds) representing the cutoff date.
             Items older than this date were eligible for cleanup based on
-            the configured retention period.
+            the configured retention period. A `state_housekeeping` operation has
+            no retention period, so for it this is the time the operation started.
           example: 1676309234
 
     CleanupType:
@@ -5431,7 +6671,195 @@ components:
         - changesets
         - reconciliation_results
         - validations
+        - audit_records
+        - state_housekeeping
       example: changesets
+
+    QueryAuditRecordsResponse:
+      type: object
+      description: A page of the audit trail, ordered oldest first.
+      required:
+        - records
+        - hasMore
+      properties:
+        records:
+          type: array
+          description: |
+            The matching audit records, ordered by timestamp and then by ID.
+          items:
+            $ref: "#/components/schemas/AuditRecord"
+        hasMore:
+          type: boolean
+          description: |
+            Whether the trail holds further records matching the query beyond this page.
+
+            This is reported rather than left to be inferred from the number of records
+            returned, because a full page is not by itself evidence of more: a page that
+            is exactly the remainder returns `hasMore` as `false`, so no request is
+            needed to discover the end. It also means a page of the trail cannot be
+            mistaken for the whole answer to what a principal did.
+          example: true
+        nextCursor:
+          allOf:
+            - $ref: "#/components/schemas/AuditRecordCursor"
+          description: |
+            Resumes the listing immediately after this page. Absent when `hasMore` is
+            `false`.
+
+    AuditRecordCursor:
+      type: object
+      description: |
+        Where to resume an audit trail listing. Pass these as the `afterTimestamp` and
+        `afterId` query parameters of the next request.
+      required:
+        - afterTimestamp
+        - afterId
+      properties:
+        afterTimestamp:
+          type: integer
+          format: int64
+          description: The timestamp of the last record in the page, in seconds.
+          example: 1678901234
+        afterId:
+          type: string
+          format: uuid
+          description: The ID of the last record in the page.
+          example: "550e8400-e29b-41d4-a716-446655440000"
+
+    AuditRecordOutcome:
+      type: string
+      description: |
+        Whether the action succeeded. `failure` covers anything the engine did not answer with
+        a 2xx status, including a request refused before it changed anything; the status code
+        distinguishes the two.
+      enum:
+        - success
+        - failure
+      example: success
+
+    AuditRecord:
+      type: object
+      description: |
+        A record of who did what, to what, and whether it worked.
+
+        The Deploy Engine emits these; policy and reporting belong to the layer above it. What
+        the engine is uniquely able to say is the attribution: it is the only thing that sees
+        the credential, and the credential is discarded once the request has been
+        authenticated.
+
+        The principal fields are flattened rather than nested so that a record is one level
+        deep and greppable, and so that the subject cannot be confused for the credential it
+        was derived from.
+      required:
+        - id
+        - timestamp
+        - action
+        - outcome
+        - statusCode
+        - method
+        - path
+        - principalMethod
+        - principalSubject
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: |
+            Unique identifier for the record, assigned when the record is emitted rather than
+            when it is stored, so that the same identifier appears wherever the record is
+            written.
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix timestamp (seconds) when the action was taken
+          example: 1678901234
+        action:
+          type: string
+          description: |
+            The name of what was done. Named per route, so an action does not change name when
+            an identifier changes. A mutating route the engine has no name for is recorded
+            under its method and path template instead, so the trail is never silently missing
+            an action.
+          example: instance.destroy
+        target:
+          type: string
+          description: What the action was done to, where the action names one
+          example: "4e3b1f2a-9c7d-4a51-8f6e-2b0c9d3a1e55"
+        outcome:
+          $ref: "#/components/schemas/AuditRecordOutcome"
+        statusCode:
+          type: integer
+          description: |
+            The HTTP status the request was answered with, which distinguishes a rejection from
+            a failure that the outcome alone does not.
+          example: 200
+        method:
+          type: string
+          description: The HTTP method of the request as received
+          example: POST
+        path:
+          type: string
+          description: The path of the request as received
+          example: /deployments/instances/4e3b1f2a-9c7d-4a51-8f6e-2b0c9d3a1e55/destroy
+        principalMethod:
+          type: string
+          description: How the principal authenticated
+          enum:
+            - oidc
+            - sigv1
+            - apikey
+          example: apikey
+        principalSubject:
+          type: string
+          description: |
+            Who acted. For an API key this is a fingerprint of the key rather than the key
+            itself; for a JWT it is the subject claim; for a signed request it is the key ID.
+          example: "sha256:9f86d081884c7d65"
+        principalName:
+          type: string
+          description: A human-readable name for the principal, where one is available
+          example: ci-deployer
+        onBehalfOf:
+          type: string
+          description: |
+            The end user a trusted fronting service asserted, where identity propagation is in
+            use.
+          example: "user@example.com"
+        sourceIp:
+          type: string
+          description: |
+            Where the request came from, preferring what a fronting proxy reported. The
+            forwarded value is the caller's own claim unless a proxy is known to set it, so it
+            is reliable only as far as the deployment's front door is trusted.
+          example: "203.0.113.42"
+        userAgent:
+          type: string
+          description: The user agent the request was made with
+          example: "bluelink-cli/1.0"
+        requestId:
+          type: string
+          description: |
+            Correlates the record with the request, taken from the caller's `X-Request-Id`
+            header where one was supplied so that a trail can be followed across components,
+            and generated by the Deploy Engine otherwise.
+          example: "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+        traceId:
+          type: string
+          description: |
+            Identifies the distributed trace the action was carried out under, so that an
+            audited action leads to the trace of the work it did and back.
+
+            Absent where the Deploy Engine is not exporting traces, which is the default, and
+            absent where the trace was one the sampler declined, rather than carrying an
+            identifier that resolves to nothing.
+          example: "4bf92f3577b34da6a3ce929d0e0e4736"
+        spanId:
+          type: string
+          description: |
+            Identifies the span within that trace, which is the unit of work the action
+            corresponds to. Absent whenever `traceId` is.
+          example: "00f067aa0ba902b7"
 
     CleanupOperationStatus:
       type: string
@@ -5654,18 +7082,29 @@ components:
               resourceId: ""
               resourceName: my-new-resource
               instanceId: ""
-              currentResourceState: {}
-              resourceWithResolvedSubs: {}
+              currentResourceState: null
+              resourceWithResolvedSubs:
+                type: "aws/lambda/function"
+                spec:
+                  functionName: my-new-function
+                  handler: index.handler
+                  runtime: nodejs20.x
             mustRecreate: false
             modifiedFields: []
-            newFields: []
+            newFields:
+              - fieldPath: spec.functionName
+                prevValue: null
+                newValue: my-new-function
+                mustRecreate: false
+                sensitive: false
             removedFields: []
             unchangedFields: []
-            computedFields: []
-            fieldChangesKnownOnDeploy: false
+            computedFields:
+              - spec.arn
+            fieldChangesKnownOnDeploy: []
             conditionKnownOnDeploy: false
-            newOutboundLinks: []
-            outboundLinkChanges: []
+            newOutboundLinks: {}
+            outboundLinkChanges: {}
             removedOutboundLinks: []
         resourceChanges:
           my-existing-resource:
@@ -5674,7 +7113,7 @@ components:
               resourceName: my-existing-resource
               instanceId: a97cf86f-2a5e-4614-984e-da480a0daa7a
               currentResourceState:
-                resourceId: 60d7c6c5-3984-42b9-a3c1-ae8a47a9bf55
+                id: 60d7c6c5-3984-42b9-a3c1-ae8a47a9bf55
                 name: my-existing-resource
                 type: "aws/lambda/function"
                 instanceId: a97cf86f-2a5e-4614-984e-da480a0daa7a
@@ -5697,10 +7136,7 @@ components:
                   custom:
                     owner: bluelink
                     version: 1.0.0
-                dependsOnResources: []
-                dependsOnChildren: []
                 failureReasons: []
-                drifted: false
                 durations:
                   configCompleteDuration: 10000.0
                   totalDuration: 20000.0
@@ -5722,24 +7158,37 @@ components:
                   runtime: nodejs20.x
             mustRecreate: false
             modifiedFields:
-              - field1
+              - fieldPath: spec.handler
+                prevValue: index.handler
+                newValue: index.handlerUpdated
+                mustRecreate: false
+                sensitive: false
             newFields: []
             removedFields: []
             unchangedFields:
-              - field2
+              - spec.functionName
+              - spec.runtime
             computedFields:
-              - field3
-            fieldChangesKnownOnDeploy: true
+              - spec.arn
+            fieldChangesKnownOnDeploy:
+              - spec.environment.variables.QUEUE_URL
             conditionKnownOnDeploy: false
-            newOutboundLinks: []
-            outboundLinkChanges: []
-            removedOutboundLinks: []
+            newOutboundLinks:
+              my-new-queue:
+                modifiedFields: []
+                newFields: []
+                removedFields: []
+                unchangedFields: []
+                fieldChangesKnownOnDeploy: []
+            outboundLinkChanges: {}
+            removedOutboundLinks:
+              - my-old-table
         removedResources:
           - my-old-resource
         retainedResources:
           - my-retained-resource
         removedLinks:
-          - my-old-link
+          - my-existing-resource::my-old-table
         newChildren:
           my-new-child:
             newResources:
@@ -5748,26 +7197,38 @@ components:
                   resourceId: ""
                   resourceName: my-new-resource
                   instanceId: ""
-                  currentResourceState: {}
-                  resourceWithResolvedSubs: {}
+                  currentResourceState: null
+                  resourceWithResolvedSubs:
+                    type: "aws/lambda/function"
+                    spec:
+                      functionName: my-new-function
+                      handler: index.handler
+                      runtime: nodejs20.x
                 mustRecreate: false
                 modifiedFields: []
-                newFields: []
+                newFields:
+                  - fieldPath: spec.functionName
+                    prevValue: null
+                    newValue: my-new-function
+                    mustRecreate: false
+                    sensitive: false
                 removedFields: []
                 unchangedFields: []
-                computedFields: []
-                fieldChangesKnownOnDeploy: false
+                computedFields:
+                  - spec.arn
+                fieldChangesKnownOnDeploy: []
                 conditionKnownOnDeploy: false
-                newOutboundLinks: []
-                outboundLinkChanges: []
+                newOutboundLinks: {}
+                outboundLinkChanges: {}
                 removedOutboundLinks: []
             newChildren: {}
             newExports:
               my-new-export:
                 fieldPath: my-new-export
-                prevValue: ""
+                prevValue: null
                 newValue: my-new-export
                 mustRecreate: false
+                sensitive: false
         childChanges: {}
         recreateChildren:
           - another-child-blueprint
@@ -5776,15 +7237,17 @@ components:
         newExports:
           parent-new-export:
             fieldPath: parent-new-export
-            prevValue: ""
+            prevValue: null
             newValue: parent-new-export
             mustRecreate: false
+            sensitive: false
         exportChanges:
           parent-existing-export:
             fieldPath: parent-existing-export
             prevValue: old-value
             newValue: new-value
             mustRecreate: false
+            sensitive: false
         unchangedExports:
           - parent-unchanged-export
         removedExports:
@@ -5792,14 +7255,16 @@ components:
         metadataChanges:
           newFields:
             - fieldPath: metadata.new-field
-              prevValue: ""
+              prevValue: null
               newValue: new-value
               mustRecreate: false
+              sensitive: false
           modifiedFields:
             - fieldPath: metadata.modified-field
               prevValue: old-value
               newValue: new-value
               mustRecreate: false
+              sensitive: false
           unchangedFields:
             - metadata.unchanged-field
           removedFields:
@@ -5810,17 +7275,14 @@ components:
 
   securitySchemes:
     oauth_jwt:
-      type: oauth2
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
       description: |
-        OAuth2/OIDC auth using JWT Bearer tokens.
-        The token issuer will be configured independently for each Deploy Engine instance.
-      name: OAuth2/OIDC with JWT Bearer tokens
-      openIdConnectUrl: "https://example.bluelink.dev/.well-known/openid-configuration"
-      flows:
-        clientCredentials:
-          tokenUrl: "[issuerTokenEndpoint]"
-          scopes: {}
-      in: header
+        OAuth2/OIDC auth using JWT bearer tokens, sent in the `Authorization` header as
+        `Bearer <token>`.
+        The token issuer is configured independently for each Deploy Engine instance, so
+        tokens are obtained from that issuer rather than from the Deploy Engine.
     api_key:
       type: apiKey
       description: |
