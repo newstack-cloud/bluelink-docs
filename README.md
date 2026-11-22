@@ -9,10 +9,7 @@ This is a Next.js application generated with
 Run development server:
 
 ```bash
-npm run dev
-# or
-pnpm dev
-# or
+yarn fetch-releases
 yarn dev
 ```
 
@@ -22,14 +19,14 @@ Open http://localhost:3000 with your browser to see the result.
 
 In the project, you can see:
 
-- `lib/source.ts`: Code for content source adapter, [`loader()`](https://fumadocs.dev/docs/headless/source-api) provides the interface to access your content.
-- `lib/layout.shared.tsx`: Shared options for layouts, optional but preferred to keep.
+- `src/lib/source.ts`: Code for content source adapter, [`loader()`](https://fumadocs.dev/docs/headless/source-api) provides the interface to access your content.
+- `src/lib/layout.shared.tsx`: Shared options for layouts, optional but preferred to keep.
 
 | Route                     | Description                                            |
 | ------------------------- | ------------------------------------------------------ |
-| `app/(home)`              | The route group for your landing page and other pages. |
-| `app/docs`                | The documentation layout and pages.                    |
-| `app/api/search/route.ts` | The Route Handler for search.                          |
+| `src/app/(home)`          | The route group for your landing page and other pages. |
+| `src/app/docs`            | The documentation layout and pages.                    |
+| `src/app/static.json`     | The search index export, synced to Algolia.            |
 
 ### Fumadocs MDX
 
@@ -39,9 +36,9 @@ Read the [Introduction](https://fumadocs.dev/docs/mdx) for further details.
 
 ## Partial Versioning
 
-The Celerity docs site is made up of sections for different components of the framework.
+The Bluelink docs site is made up of sections for different components of Bluelink.
 
-The following components are independently versioned:
+The following components can be versioned independently (none is yet):
 
 - CLI
 - Deploy Engine
@@ -89,7 +86,7 @@ The source OpenAPI specification can be found in the `api-docs` directory.
 
 ## Fetching Release Data
 
-The installation page displays download links and version information for Bluelink components. This data is fetched from GitHub releases at build time and stored in `src/data/releases.json`.
+The installation page displays download links and version information for Bluelink components, and every docs page loads the components that render it, so the docs don't build without it. This data is fetched from GitHub releases at build time and stored in `src/data/releases.json`.
 
 This file is not committed to version control and is generated automatically during the deploy workflow. To generate it locally for development:
 
@@ -113,4 +110,4 @@ resources:
 - [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js
   features and API.
 - [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [Fumadocs](https://fumadocs.vercel.app) - learn about Fumadocs
+- [Fumadocs](https://fumadocs.dev) - learn about Fumadocs
