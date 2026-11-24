@@ -973,10 +973,16 @@ paths:
             Conflict. A blueprint instance with the requested `instanceName` already exists,
             including one created by a concurrent request for the same name. The response
             carries the `INSTANCE_ALREADY_EXISTS` code and the ID of the existing instance.
+
+            A change set staged against an existing instance is rejected with the
+            `CHANGESET_INSTANCE_MISMATCH` code, as its changes were computed against that
+            instance; stage changes for a new instance and try again.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/InstanceAlreadyExistsError"
+                oneOf:
+                  - $ref: "#/components/schemas/InstanceAlreadyExistsError"
+                  - $ref: "#/components/schemas/ChangesetInstanceMismatchError"
         "422":
           description: |
             Unprocessable entity. Request-field validation or plugin configuration
@@ -1090,10 +1096,16 @@ paths:
             Operation blocked because the change set has the `DRIFT_DETECTED` status.
             Not returned when `force` is true.
             Use the reconciliation endpoints to resolve drift before retrying.
+
+            A change set staged for a new or different instance is rejected with the
+            `CHANGESET_INSTANCE_MISMATCH` code, even with `force`, as its changes were not
+            computed against this instance; stage changes against the instance and try again.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DriftBlockedResponse"
+                oneOf:
+                  - $ref: "#/components/schemas/DriftBlockedResponse"
+                  - $ref: "#/components/schemas/ChangesetInstanceMismatchError"
         default:
           description: Unexpected error
           content:
@@ -1272,10 +1284,16 @@ paths:
             Not returned when `force` is true.
             Use the reconciliation endpoints to resolve drift before retrying,
             or use the `force` option to proceed regardless.
+
+            A change set staged for a new or different instance is rejected with the
+            `CHANGESET_INSTANCE_MISMATCH` code, even with `force`, as its changes were not
+            computed against this instance; stage changes against the instance and try again.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DriftBlockedResponse"
+                oneOf:
+                  - $ref: "#/components/schemas/DriftBlockedResponse"
+                  - $ref: "#/components/schemas/ChangesetInstanceMismatchError"
         default:
           description: Unexpected error
           content:
@@ -6516,6 +6534,39 @@ components:
           description: |
             The ID of the blueprint instance that already has the requested name.
             Omitted when that instance was removed before it could be looked up.
+          example: 16ef8989-af00-4a4a-8164-72493ceb1aa0
+      required:
+        - message
+        - code
+
+    ChangesetInstanceMismatchError:
+      type: object
+      description: |
+        Response when the change set given by `changeSetId` was staged for a different target
+        than the one being deployed or destroyed: an existing instance for a create, or a new
+        or different instance for an update or destroy.
+      properties:
+        message:
+          type: string
+          example: >-
+            change set "e6b8e2a4-5f0c-4f7e-9d5b-2b1c7a0d8f31" was staged for a new blueprint
+            instance, not instance "16ef8989-af00-4a4a-8164-72493ceb1aa0"; stage changes
+            against the instance and try again
+        code:
+          type: string
+          enum:
+            - CHANGESET_INSTANCE_MISMATCH
+        changesetInstanceId:
+          type: string
+          description: |
+            The ID of the instance the change set was staged against.
+            Omitted when the change set was staged for a new instance.
+          example: 0b6f1c2e-3a4d-4b5e-8f9a-1c2d3e4f5a6b
+        instanceId:
+          type: string
+          description: |
+            The ID of the instance being deployed or destroyed.
+            Omitted for a create, where there is no instance yet.
           example: 16ef8989-af00-4a4a-8164-72493ceb1aa0
       required:
         - message
