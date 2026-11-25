@@ -21,7 +21,7 @@ const features = [
             <>
                 Alongside the usual providers, transformers let you and other
                 plugin authors define high level building blocks on top of raw cloud resources,
-                like <a href="https://celerityframework.io" className="text-blue-600 dark:text-blue-400">Celerity&apos;s</a> portable multi-cloud primitives.
+                like <a href="https://celerity.dev" className="text-blue-600 dark:text-blue-400">Celerity&apos;s</a> portable multi-cloud primitives.
                 <br />
                 <br />
                 Your team composes meaningful components instead of wiring providers
